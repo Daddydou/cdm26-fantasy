@@ -1,0 +1,183 @@
+export type Position = 'GK' | 'DEF' | 'MID' | 'ATT'
+export type Phase =
+  | 'draft'
+  | 'poule'
+  | 'post_poule'
+  | 'huitieme'
+  | 'post_8'
+  | 'quart'
+  | 'post_quart'
+  | 'demi'
+  | 'post_demi'
+  | 'finale'
+  | 'termine'
+export type PricePhase = 'initial' | 'post_poule' | 'post_8' | 'post_quart' | 'post_demi'
+
+export type Database = {
+  public: {
+    Tables: {
+      cdm_players: {
+        Row: {
+          id: string
+          name: string
+          position: Position
+          team: string
+          nationality: string
+          transfermarkt_value_m: number
+          sofascore_id: string | null
+          photo_url: string | null
+          active: boolean
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['cdm_players']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['cdm_players']['Insert']>
+      }
+      cdm_teams: {
+        Row: {
+          id: string
+          name: string
+          odds_winner: number | null
+          team_score: number | null
+          updated_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['cdm_teams']['Row'], 'id' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['cdm_teams']['Insert']>
+      }
+      cdm_prices: {
+        Row: {
+          id: string
+          player_id: string
+          phase: PricePhase
+          team_odds: number | null
+          price: number
+          computed_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['cdm_prices']['Row'], 'id' | 'computed_at'>
+        Update: Partial<Database['public']['Tables']['cdm_prices']['Insert']>
+      }
+      cdm_leagues: {
+        Row: {
+          id: string
+          name: string
+          code: string
+          admin_user_id: string | null
+          phase: Phase
+          budget_per_user: number
+          draft_open: boolean
+          market_open: boolean
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['cdm_leagues']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['cdm_leagues']['Insert']>
+      }
+      cdm_participants: {
+        Row: {
+          id: string
+          league_id: string
+          user_id: string
+          display_name: string
+          budget_remaining: number
+          joined_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['cdm_participants']['Row'], 'id' | 'joined_at'>
+        Update: Partial<Database['public']['Tables']['cdm_participants']['Insert']>
+      }
+      cdm_squads: {
+        Row: {
+          id: string
+          league_id: string
+          participant_id: string
+          player_id: string
+          bought_at_price: number
+          bought_at_phase: string
+          sold_at_price: number | null
+          sold_at_phase: string | null
+          sold_at: string | null
+          active: boolean
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['cdm_squads']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['cdm_squads']['Insert']>
+      }
+      cdm_matches: {
+        Row: {
+          id: string
+          sofascore_match_id: string
+          phase: string
+          round: string | null
+          home_team: string
+          away_team: string
+          match_date: string
+          processed: boolean
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['cdm_matches']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['cdm_matches']['Insert']>
+      }
+      cdm_scores: {
+        Row: {
+          id: string
+          player_id: string
+          match_id: string
+          sofascore_match_id: string | null
+          rating: number | null
+          minutes_played: number
+          match_date: string | null
+          fetched_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['cdm_scores']['Row'], 'id' | 'fetched_at'>
+        Update: Partial<Database['public']['Tables']['cdm_scores']['Insert']>
+      }
+    }
+    Views: {
+      cdm_standings: {
+        Row: {
+          league_id: string
+          participant_id: string
+          user_id: string
+          display_name: string
+          budget_remaining: number
+          total_points: number
+          total_spent: number
+          value_for_money: number
+        }
+      }
+      cdm_squad_detail: {
+        Row: {
+          league_id: string
+          participant_id: string
+          squad_id: string
+          active: boolean
+          bought_at_price: number
+          bought_at_phase: string
+          sold_at_price: number | null
+          player_id: string
+          player_name: string
+          position: Position
+          team: string
+          photo_url: string | null
+          total_rating: number
+          matches_played: number
+        }
+      }
+    }
+  }
+}
+
+// Helpers
+export type Player = Database['public']['Tables']['cdm_players']['Row']
+export type Team = Database['public']['Tables']['cdm_teams']['Row']
+export type Price = Database['public']['Tables']['cdm_prices']['Row']
+export type League = Database['public']['Tables']['cdm_leagues']['Row']
+export type Participant = Database['public']['Tables']['cdm_participants']['Row']
+export type Squad = Database['public']['Tables']['cdm_squads']['Row']
+export type Match = Database['public']['Tables']['cdm_matches']['Row']
+export type Score = Database['public']['Tables']['cdm_scores']['Row']
+export type Standing = Database['public']['Views']['cdm_standings']['Row']
+export type SquadDetail = Database['public']['Views']['cdm_squad_detail']['Row']
+
+// Player avec prix courant (utilisé partout dans l'UI)
+export type PlayerWithPrice = Player & {
+  current_price: number | null
+  current_phase: PricePhase | null
+}
