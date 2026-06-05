@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { League, Participant, DailyStanding } from '@/lib/database.types'
+import { League, Participant } from '@/lib/database.types'
 
 interface DayStanding {
   participant_id: string
@@ -49,7 +49,7 @@ export default function DailyPage() {
 
       // Grouper par jour
       const grouped: Record<string, DayStanding[]> = {}
-      for (const row of ((rows || []) as unknown as DailyStanding[])) {
+      for (const row of (rows || [])) {
         const day = row.match_day
         if (!grouped[day]) grouped[day] = []
         grouped[day].push(row)
