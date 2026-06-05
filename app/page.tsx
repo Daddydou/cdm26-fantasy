@@ -15,52 +15,31 @@ export default function HomePage() {
   const [error, setError] = useState('')
   const [checking, setChecking] = useState(true)
 
+  // Auto-reconnexion si session sauvegardée
   useEffect(() => {
     async function tryAutoLogin() {
       try {
         const saved = localStorage.getItem(STORAGE_KEY)
         if (!saved) { setChecking(false); return }
-
-        const { leagueCode } = JSON.parse(saved)
-        if (!leagueCode) { setChecking(false); return }
+        const { leagueCode, userId } = JSON.parse(saved)
+        if (!leagueCode || !userId) { setChecking(false); return }
 
         const { supabase } = await import('@/lib/supabase')
 
-        // Récupérer la session existante
-        let { data: { user } } = await supabase.auth.getUser()
+        // Vérifier que la session Supabase est encore valide
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) { localStorage.removeItem(STORAGE_KEY); setChecking(false); return }
 
-        // Si pas de session, re-signer anonymement
-        if (!user) {
-          const { data } = await supabase.auth.signInAnonymously()
-          user = data.user
-
-          // Vérifier que ce nouvel utilisateur a bien un participant dans la ligue
-          if (user) {
-            const { data: lg } = await supabase
-              .from('fantasy_leagues').select('id').eq('code', leagueCode).single()
-            if (lg) {
-              const { data: participant } = await supabase
-                .from('fantasy_participants').select('id')
-                .eq('league_id', lg.id).eq('user_id', user.id).single()
-              // Nouveau user anonyme n'a pas de participant → afficher l'accueil
-              if (!participant) { setChecking(false); return }
-            }
-          }
-        }
-
-        if (!user) { setChecking(false); return }
-
-        // Vérifier que le participant existe pour cet user
-        const { data: lg } = await supabase
-          .from('fantasy_leagues').select('id').eq('code', leagueCode).single()
-        if (!lg) { localStorage.removeItem(STORAGE_KEY); setChecking(false); return }
+        // Vérifier que le participant existe toujours
+        const { data: league } = await supabase
+          .from('fantasy_leagues').select('code').eq('code', leagueCode).single()
+        if (!league) { localStorage.removeItem(STORAGE_KEY); setChecking(false); return }
 
         const { data: participant } = await supabase
-          .from('fantasy_participants').select('id')
-          .eq('league_id', lg.id).eq('user_id', user.id).single()
+          .from('fantasy_participants').select('id').eq('user_id', user.id).eq('league_id', (await supabase.from('fantasy_leagues').select('id').eq('code', leagueCode).single()).data?.id).single()
         if (!participant) { localStorage.removeItem(STORAGE_KEY); setChecking(false); return }
 
-        // Tout OK → rediriger
+        // Session valide → rediriger
         router.push(`/league/${leagueCode}`)
       } catch {
         setChecking(false)
@@ -96,6 +75,7 @@ export default function HomePage() {
         throw joinError
       }
 
+      // Sauvegarder la session
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ leagueCode: league.code, userId }))
       router.push(`/league/${league.code}`)
     } catch (e) {
@@ -136,6 +116,7 @@ export default function HomePage() {
         budget_remaining: league.budget_per_user,
       })
 
+      // Sauvegarder la session
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ leagueCode: league.code, userId }))
       router.push(`/league/${leagueCode}/admin`)
     } catch (e) {
