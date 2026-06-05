@@ -2,45 +2,58 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 
-const STORAGE_KEY = 'cdm26_session'
+const ADMIN_EMAIL = 'lolo.rms@gmail.com'
+const STORAGE_KEY = 'cdm26_league'
 
 export default function HomePage() {
   const router = useRouter()
-  const [tab, setTab] = useState<'join' | 'create'>('join')
+  const [step, setStep] = useState<'home' | 'email' | 'check_email' | 'join_name'>('home')
+  const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [leagueName, setLeagueName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [checking, setChecking] = useState(true)
+  const [isCreate, setIsCreate] = useState(false)
 
-  // Auto-reconnexion si session sauvegardée
   useEffect(() => {
     async function tryAutoLogin() {
       try {
-        const saved = localStorage.getItem(STORAGE_KEY)
-        if (!saved) { setChecking(false); return }
-        const { leagueCode, userId } = JSON.parse(saved)
-        if (!leagueCode || !userId) { setChecking(false); return }
-
-        const { supabase } = await import('@/lib/supabase')
-
-        // Vérifier que la session Supabase est encore valide
         const { data: { user } } = await supabase.auth.getUser()
-        if (!user) { localStorage.removeItem(STORAGE_KEY); setChecking(false); return }
+        if (!user) { setChecking(false); return }
 
-        // Vérifier que le participant existe toujours
-        const { data: league } = await supabase
-          .from('fantasy_leagues').select('code').eq('code', leagueCode).single()
-        if (!league) { localStorage.removeItem(STORAGE_KEY); setChecking(false); return }
+        // Session valide — trouver sa ligue
+        const savedCode = localStorage.getItem(STORAGE_KEY)
+        if (savedCode) {
+          const { data: lg } = await supabase
+            .from('fantasy_leagues').select('id').eq('code', savedCode).single()
+          if (lg) {
+            const { data: p } = await supabase
+              .from('fantasy_participants').select('id')
+              .eq('league_id', lg.id).eq('user_id', user.id).single()
+            if (p) { router.push(`/league/${savedCode}`); return }
+          }
+        }
 
-        const { data: participant } = await supabase
-          .from('fantasy_participants').select('id').eq('user_id', user.id).eq('league_id', (await supabase.from('fantasy_leagues').select('id').eq('code', leagueCode).single()).data?.id).single()
-        if (!participant) { localStorage.removeItem(STORAGE_KEY); setChecking(false); return }
+        // Session valide mais pas de ligue → chercher sa ligue
+        const { data: p } = await supabase
+          .from('fantasy_participants').select('league_id, fantasy_leagues(code)')
+          .eq('user_id', user.id).limit(1).single()
 
-        // Session valide → rediriger
-        router.push(`/league/${leagueCode}`)
+        if (p) {
+          const leagueCode = (p.fantasy_leagues as any)?.code
+          if (leagueCode) {
+            localStorage.setItem(STORAGE_KEY, leagueCode)
+            router.push(`/league/${leagueCode}`)
+            return
+          }
+        }
+
+        // Connecté mais pas encore dans une ligue
+        setChecking(false)
       } catch {
         setChecking(false)
       }
@@ -48,35 +61,52 @@ export default function HomePage() {
     tryAutoLogin()
   }, [router])
 
-  async function handleJoin() {
-    if (!code.trim() || !displayName.trim()) return
+  async function sendMagicLink() {
+    if (!email.trim()) return
     setLoading(true)
     setError('')
     try {
-      const { supabase } = await import('@/lib/supabase')
-      const { data: authData, error: authError } = await supabase.auth.signInAnonymously()
-      if (authError) throw authError
-      const userId = authData.user?.id
-      if (!userId) throw new Error('Auth échouée')
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim().toLowerCase(),
+        options: {
+          shouldCreateUser: true,
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        }
+      })
+      if (error) throw error
+      setStep('check_email')
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-      const { data: league, error: leagueError } = await supabase
+  async function handleJoin() {
+    if (!displayName.trim()) return
+    setLoading(true)
+    setError('')
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Non connecté')
+
+      const { data: league, error: lgErr } = await supabase
         .from('fantasy_leagues').select().eq('code', code.toUpperCase().trim()).single()
-      if (leagueError || !league) throw new Error('Code de ligue invalide')
+      if (lgErr || !league) throw new Error('Code de ligue invalide')
 
       const { error: joinError } = await supabase
         .from('fantasy_participants').insert({
           league_id: league.id,
-          user_id: userId,
+          user_id: user.id,
           display_name: displayName.trim(),
           budget_remaining: league.budget_per_user,
         })
       if (joinError) {
-        if (joinError.code === '23505') throw new Error('Ce pseudo est déjà pris dans cette ligue')
+        if (joinError.code === '23505') throw new Error('Tu es déjà dans cette ligue')
         throw joinError
       }
 
-      // Sauvegarder la session
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ leagueCode: league.code, userId }))
+      localStorage.setItem(STORAGE_KEY, league.code)
       router.push(`/league/${league.code}`)
     } catch (e) {
       setError((e as Error).message)
@@ -90,18 +120,15 @@ export default function HomePage() {
     setLoading(true)
     setError('')
     try {
-      const { supabase } = await import('@/lib/supabase')
-      const { data: authData, error: authError } = await supabase.auth.signInAnonymously()
-      if (authError) throw authError
-      const userId = authData.user?.id
-      if (!userId) throw new Error('Auth échouée')
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Non connecté')
 
       const leagueCode = Math.random().toString(36).substring(2, 8).toUpperCase()
       const { data: league, error: createError } = await supabase
         .from('fantasy_leagues').insert({
           name: leagueName.trim(),
           code: leagueCode,
-          admin_user_id: userId,
+          admin_user_id: user.id,
           phase: 'draft',
           budget_per_user: 2150,
           draft_open: false,
@@ -111,14 +138,13 @@ export default function HomePage() {
 
       await supabase.from('fantasy_participants').insert({
         league_id: league.id,
-        user_id: userId,
+        user_id: user.id,
         display_name: displayName.trim(),
         budget_remaining: league.budget_per_user,
       })
 
-      // Sauvegarder la session
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ leagueCode: league.code, userId }))
-      router.push(`/league/${leagueCode}/admin`)
+      localStorage.setItem(STORAGE_KEY, leagueCode)
+      router.push(`/league/${leagueCode}`)
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -141,46 +167,88 @@ export default function HomePage() {
       </div>
 
       <div className="card w-full max-w-md p-6">
-        <div className="flex gap-1 bg-white/5 rounded-lg p-1 mb-6">
-          {(['join', 'create'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)}
-              className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${tab === t ? 'bg-brand-500 text-white' : 'text-white/50 hover:text-white'}`}>
-              {t === 'join' ? 'Rejoindre une ligue' : 'Créer une ligue'}
-            </button>
-          ))}
-        </div>
 
-        {tab === 'join' ? (
-          <div className="space-y-4">
-            <div>
-              <label className="text-xs text-white/50 mb-1.5 block">Code de ligue</label>
-              <input className="input uppercase tracking-widest text-center text-lg font-bold"
-                placeholder="ABC123" value={code} onChange={e => setCode(e.target.value)} maxLength={6} />
-            </div>
-            <div>
-              <label className="text-xs text-white/50 mb-1.5 block">Ton pseudo</label>
-              <input className="input" placeholder="Comment tu veux t'appeler ?"
-                value={displayName} onChange={e => setDisplayName(e.target.value)} />
-            </div>
-            <button onClick={handleJoin} disabled={loading || !code || !displayName} className="btn-primary w-full py-3 text-base">
-              {loading ? 'Connexion…' : 'Rejoindre →'}
+        {/* Étape 1 : home */}
+        {step === 'home' && (
+          <div className="space-y-3">
+            <button onClick={() => { setIsCreate(false); setStep('email') }}
+              className="btn-primary w-full py-3 text-base">
+              Rejoindre une ligue →
+            </button>
+            <button onClick={() => { setIsCreate(true); setStep('email') }}
+              className="btn-ghost w-full py-3 text-base">
+              Créer une ligue
             </button>
           </div>
-        ) : (
+        )}
+
+        {/* Étape 2 : email */}
+        {step === 'email' && (
           <div className="space-y-4">
+            <button onClick={() => setStep('home')} className="text-white/40 text-sm hover:text-white">← Retour</button>
             <div>
-              <label className="text-xs text-white/50 mb-1.5 block">Nom de la ligue</label>
-              <input className="input" placeholder="Les Experts CDM"
-                value={leagueName} onChange={e => setLeagueName(e.target.value)} />
+              <label className="text-xs text-white/50 mb-1.5 block">Ton adresse email</label>
+              <input className="input" type="email" placeholder="toi@email.com"
+                value={email} onChange={e => setEmail(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && sendMagicLink()} />
             </div>
-            <div>
-              <label className="text-xs text-white/50 mb-1.5 block">Ton pseudo (admin)</label>
-              <input className="input" placeholder="Comment tu veux t'appeler ?"
-                value={displayName} onChange={e => setDisplayName(e.target.value)} />
-            </div>
-            <button onClick={handleCreate} disabled={loading || !leagueName || !displayName} className="btn-primary w-full py-3 text-base">
-              {loading ? 'Création…' : 'Créer la ligue →'}
+            {!isCreate && (
+              <div>
+                <label className="text-xs text-white/50 mb-1.5 block">Code de ligue</label>
+                <input className="input uppercase tracking-widest text-center text-lg font-bold"
+                  placeholder="ABC123" value={code} onChange={e => setCode(e.target.value)} maxLength={6} />
+              </div>
+            )}
+            <button onClick={sendMagicLink} disabled={loading || !email}
+              className="btn-primary w-full py-3 text-base">
+              {loading ? 'Envoi…' : 'Recevoir le lien de connexion →'}
             </button>
+            <p className="text-xs text-white/30 text-center">Un lien magique sera envoyé à ton email — pas de mot de passe !</p>
+          </div>
+        )}
+
+        {/* Étape 3 : vérifier email */}
+        {step === 'check_email' && (
+          <div className="text-center space-y-4">
+            <div className="text-5xl">📬</div>
+            <h2 className="text-lg font-semibold text-white">Vérifie tes emails !</h2>
+            <p className="text-sm text-white/50">
+              On a envoyé un lien de connexion à<br />
+              <span className="text-white font-medium">{email}</span>
+            </p>
+            <p className="text-xs text-white/30">Clique sur le lien dans l'email pour accéder à l'app.</p>
+            <button onClick={() => setStep('email')} className="btn-ghost text-sm w-full">
+              ← Changer d'email
+            </button>
+          </div>
+        )}
+
+        {/* Étape 4 : pseudo (après callback) */}
+        {step === 'join_name' && (
+          <div className="space-y-4">
+            {!isCreate ? (
+              <>
+                <h2 className="text-sm font-semibold text-white mb-2">Presque ! Choisis ton pseudo</h2>
+                <input className="input" placeholder="Ton pseudo dans la ligue"
+                  value={displayName} onChange={e => setDisplayName(e.target.value)} />
+                <button onClick={handleJoin} disabled={loading || !displayName}
+                  className="btn-primary w-full py-3">
+                  {loading ? 'Connexion…' : 'Rejoindre →'}
+                </button>
+              </>
+            ) : (
+              <>
+                <h2 className="text-sm font-semibold text-white mb-2">Crée ta ligue</h2>
+                <input className="input" placeholder="Nom de la ligue"
+                  value={leagueName} onChange={e => setLeagueName(e.target.value)} />
+                <input className="input" placeholder="Ton pseudo (admin)"
+                  value={displayName} onChange={e => setDisplayName(e.target.value)} />
+                <button onClick={handleCreate} disabled={loading || !leagueName || !displayName}
+                  className="btn-primary w-full py-3">
+                  {loading ? 'Création…' : 'Créer la ligue →'}
+                </button>
+              </>
+            )}
           </div>
         )}
 
