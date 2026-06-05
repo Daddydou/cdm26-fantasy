@@ -1,0 +1,202 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { supabase } from '@/lib/supabase'
+import { League, Participant } from '@/lib/database.types'
+
+interface Transfer {
+  id: string
+  player_name: string
+  player_id: string
+  position: string
+  team: string
+  photo_url: string | null
+  participant_name: string
+  participant_id: string
+  bought_at_price: number
+  bought_at_phase: string
+  sold_at_price: number | null
+  sold_at_phase: string | null
+  sold_at: string | null
+  created_at: string
+  active: boolean
+}
+
+const PHASE_LABELS: Record<string, string> = {
+  initial: 'Draft', post_poule: 'Après poule',
+  post_8: 'Après 8es', post_quart: 'Après 1/4', post_demi: 'Après demies',
+}
+
+export default function HistoryPage() {
+  const { code } = useParams<{ code: string }>()
+  const router = useRouter()
+  const [league, setLeague] = useState<League | null>(null)
+  const [me, setMe] = useState<Participant | null>(null)
+  const [transfers, setTransfers] = useState<Transfer[]>([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState<'all' | 'mine'>('all')
+
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/'); return }
+
+      const { data: lg } = await supabase.from('fantasy_leagues').select().eq('code', code).single()
+      if (!lg) { router.push('/'); return }
+      setLeague(lg)
+
+      const { data: p } = await supabase.from('fantasy_participants').select()
+        .eq('league_id', lg.id).eq('user_id', user.id).single()
+      if (!p) { router.push('/'); return }
+      setMe(p)
+
+      // Tous les transferts de la ligue
+      const { data: squads } = await supabase
+        .from('fantasy_squads')
+        .select(`
+          id, bought_at_price, bought_at_phase,
+          sold_at_price, sold_at_phase, sold_at, active, created_at,
+          fantasy_players(id, name, position, team, photo_url),
+          fantasy_participants(id, display_name)
+        `)
+        .eq('league_id', lg.id)
+        .order('created_at', { ascending: false })
+
+      const mapped: Transfer[] = (squads || []).map((s: any) => ({
+        id: s.id,
+        player_name: s.fantasy_players?.name || '?',
+        player_id: s.fantasy_players?.id || '',
+        position: s.fantasy_players?.position || '',
+        team: s.fantasy_players?.team || '',
+        photo_url: s.fantasy_players?.photo_url || null,
+        participant_name: s.fantasy_participants?.display_name || '?',
+        participant_id: s.fantasy_participants?.id || '',
+        bought_at_price: s.bought_at_price,
+        bought_at_phase: s.bought_at_phase,
+        sold_at_price: s.sold_at_price,
+        sold_at_phase: s.sold_at_phase,
+        sold_at: s.sold_at,
+        created_at: s.created_at,
+        active: s.active,
+      }))
+
+      setTransfers(mapped)
+      setLoading(false)
+    }
+    load()
+  }, [code, router])
+
+  if (loading) return <Loading />
+
+  const filtered = filter === 'mine'
+    ? transfers.filter(t => t.participant_id === me?.id)
+    : transfers
+
+  // Stats globales
+  const totalBuys = transfers.length
+  const totalSells = transfers.filter(t => !t.active && t.sold_at_price).length
+  const totalVolume = transfers.reduce((s, t) => s + t.bought_at_price, 0)
+
+  return (
+    <main className="min-h-screen p-4 max-w-lg mx-auto">
+      <div className="flex items-center gap-3 mb-5">
+        <button onClick={() => router.push(`/league/${code}`)} className="text-white/40 hover:text-white">←</button>
+        <div>
+          <h1 className="text-lg font-bold text-white">Historique des transferts</h1>
+          <p className="text-xs text-white/40">{league?.name}</p>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="card p-3 text-center">
+          <p className="text-xl font-bold text-white">{totalBuys}</p>
+          <p className="text-xs text-white/40">achats</p>
+        </div>
+        <div className="card p-3 text-center">
+          <p className="text-xl font-bold text-white">{totalSells}</p>
+          <p className="text-xs text-white/40">ventes</p>
+        </div>
+        <div className="card p-3 text-center">
+          <p className="text-xl font-bold text-white">{totalVolume.toFixed(0)}</p>
+          <p className="text-xs text-white/40">volume cr.</p>
+        </div>
+      </div>
+
+      {/* Filtre */}
+      <div className="flex gap-1 bg-white/5 rounded-lg p-1 mb-4">
+        <button onClick={() => setFilter('all')} className={`flex-1 py-2 rounded-md text-xs font-medium transition-all ${filter === 'all' ? 'bg-brand-500 text-white' : 'text-white/50'}`}>
+          Tous
+        </button>
+        <button onClick={() => setFilter('mine')} className={`flex-1 py-2 rounded-md text-xs font-medium transition-all ${filter === 'mine' ? 'bg-brand-500 text-white' : 'text-white/50'}`}>
+          Mes transferts
+        </button>
+      </div>
+
+      {/* Liste */}
+      {filtered.length === 0 ? (
+        <div className="text-center py-12 text-white/30">Aucun transfert</div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map(t => {
+            const isMe = t.participant_id === me?.id
+            const pnl = t.sold_at_price ? t.sold_at_price - t.bought_at_price : null
+            return (
+              <div key={t.id} className={`card p-3 ${isMe ? 'border-brand-500/20' : ''}`}>
+                <div className="flex items-center gap-3">
+                  {/* Photo */}
+                  <div className="w-9 h-9 rounded-full bg-white/10 flex-shrink-0 overflow-hidden">
+                    {t.photo_url
+                      ? <img src={t.photo_url} alt={t.player_name} className="w-full h-full object-cover" />
+                      : <div className="w-full h-full flex items-center justify-center text-sm">👤</div>
+                    }
+                  </div>
+                  {/* Info joueur */}
+                  <div className="flex-1 min-w-0">
+                    <Link href={`/league/${code}/player/${t.player_id}`} className="text-sm font-medium text-white hover:text-brand-400 truncate block">
+                      {t.player_name}
+                    </Link>
+                    <p className="text-xs text-white/40">{t.team} · <span className={isMe ? 'text-brand-400' : 'text-white/40'}>{t.participant_name}</span></p>
+                  </div>
+                  {/* Prix */}
+                  <div className="text-right flex-shrink-0">
+                    <div className="flex items-center gap-1 justify-end">
+                      <span className="text-xs text-green-400">+{t.bought_at_price}</span>
+                      {t.sold_at_price && (
+                        <>
+                          <span className="text-xs text-white/20">→</span>
+                          <span className="text-xs text-red-400">-{t.sold_at_price}</span>
+                        </>
+                      )}
+                    </div>
+                    {pnl !== null && (
+                      <p className={`text-xs font-bold ${pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {pnl >= 0 ? '+' : ''}{pnl.toFixed(1)}
+                      </p>
+                    )}
+                    <p className="text-xs text-white/20">{PHASE_LABELS[t.bought_at_phase] || t.bought_at_phase}</p>
+                  </div>
+                </div>
+                {/* Badge actif/vendu */}
+                <div className="flex justify-between items-center mt-2 pt-2 border-t border-white/5">
+                  <p className="text-xs text-white/20">
+                    {new Date(t.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${t.active ? 'bg-brand-500/20 text-brand-400' : 'bg-white/5 text-white/30'}`}>
+                    {t.active ? 'En équipe' : `Vendu ${t.sold_at_price} cr.`}
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </main>
+  )
+}
+
+function Loading() {
+  return <main className="min-h-screen flex items-center justify-center"><div className="text-white/40 text-sm">Chargement…</div></main>
+}
