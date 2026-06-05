@@ -147,12 +147,12 @@ export default function LeaguePage() {
         </Link>
 
         <Link
-          href={`/league/${code}/standings?tab=vfm`}
+          href={`/league/${code}/daily`}
           className="card p-4 hover:bg-white/10 transition-all text-center"
         >
           <div className="text-2xl mb-1">📈</div>
-          <p className="text-sm font-medium text-white">Value for Money</p>
-          <p className="text-xs text-white/40 mt-0.5">Meilleur nez ?</p>
+          <p className="text-sm font-medium text-white">Classement jour</p>
+          <p className="text-xs text-white/40 mt-0.5">Points par journée</p>
         </Link>
       </div>
 
@@ -202,4 +202,3 @@ function Loading() {
     </main>
   )
 }
-
