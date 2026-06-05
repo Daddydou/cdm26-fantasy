@@ -52,8 +52,11 @@ export default function AdminPage() {
   async function updateBudget(budget: number) {
     if (!league) return
     setSaving(true)
-    // Met à jour le budget de la ligue ET recalibrage pour les nouveaux arrivants
-    await supabase.from('fantasy_leagues').update({ budget_per_user: budget }).eq('id', league.id)
+    // RPC atomique : met à jour la ligue ET recalcule le budget_remaining de tous les participants
+    await supabase.rpc('fantasy_update_league_budget', {
+      p_league_id: league.id,
+      p_budget: budget,
+    })
     setLeague(prev => prev ? { ...prev, budget_per_user: budget } : prev)
     setMsg('Budget mis à jour ✓')
     setTimeout(() => setMsg(''), 2000)
@@ -252,4 +255,3 @@ function BudgetEditor({ value, onSave, saving }: { value: number; onSave: (v: nu
 function Loading() {
   return <main className="min-h-screen flex items-center justify-center"><div className="text-white/40 text-sm">Chargement…</div></main>
 }
-

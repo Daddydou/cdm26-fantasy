@@ -181,3 +181,13 @@ export type PlayerWithPrice = Player & {
   current_price: number | null
   current_phase: PricePhase | null
 }
+
+// Vue daily standings (ajoutée via migration 002)
+export type DailyStanding = {
+  league_id: string
+  participant_id: string
+  display_name: string
+  match_day: string
+  day_points: number
+  matches_scored: number
+}
