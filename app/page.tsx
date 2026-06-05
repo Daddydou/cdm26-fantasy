@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 
 const ADMIN_EMAIL = 'lolo.rms@gmail.com'
 const STORAGE_KEY = 'cdm26_league'
+const PENDING_KEY = 'cdm26_pending'
 
 export default function HomePage() {
   const router = useRouter()
@@ -18,12 +19,15 @@ export default function HomePage() {
   const [error, setError] = useState('')
   const [checking, setChecking] = useState(true)
   const [isCreate, setIsCreate] = useState(false)
+  const [loggedIn, setLoggedIn] = useState(false)
 
   useEffect(() => {
     async function tryAutoLogin() {
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) { setChecking(false); return }
+
+        setLoggedIn(true)
 
         // Session valide — trouver sa ligue
         const savedCode = localStorage.getItem(STORAGE_KEY)
@@ -52,7 +56,20 @@ export default function HomePage() {
           }
         }
 
-        // Connecté mais pas encore dans une ligue
+        // Connecté mais pas encore dans une ligue — restaurer l'intention si retour magic link
+        const pending = sessionStorage.getItem(PENDING_KEY)
+        if (pending) {
+          try {
+            const { isCreate: ic, code: c } = JSON.parse(pending)
+            sessionStorage.removeItem(PENDING_KEY)
+            setIsCreate(ic)
+            if (c) setCode(c)
+            setStep('join_name')
+            setChecking(false)
+            return
+          } catch {}
+        }
+
         setChecking(false)
       } catch {
         setChecking(false)
@@ -66,6 +83,7 @@ export default function HomePage() {
     setLoading(true)
     setError('')
     try {
+      sessionStorage.setItem(PENDING_KEY, JSON.stringify({ isCreate, code }))
       const { error } = await supabase.auth.signInWithOtp({
         email: email.trim().toLowerCase(),
         options: {
@@ -76,6 +94,7 @@ export default function HomePage() {
       if (error) throw error
       setStep('check_email')
     } catch (e) {
+      sessionStorage.removeItem(PENDING_KEY)
       setError((e as Error).message)
     } finally {
       setLoading(false)
@@ -171,11 +190,11 @@ export default function HomePage() {
         {/* Étape 1 : home */}
         {step === 'home' && (
           <div className="space-y-3">
-            <button onClick={() => { setIsCreate(false); setStep('email') }}
+            <button onClick={() => { setIsCreate(false); setStep(loggedIn ? 'join_name' : 'email') }}
               className="btn-primary w-full py-3 text-base">
               Rejoindre une ligue →
             </button>
-            <button onClick={() => { setIsCreate(true); setStep('email') }}
+            <button onClick={() => { setIsCreate(true); setStep(loggedIn ? 'join_name' : 'email') }}
               className="btn-ghost w-full py-3 text-base">
               Créer une ligue
             </button>
@@ -228,10 +247,12 @@ export default function HomePage() {
           <div className="space-y-4">
             {!isCreate ? (
               <>
-                <h2 className="text-sm font-semibold text-white mb-2">Presque ! Choisis ton pseudo</h2>
+                <h2 className="text-sm font-semibold text-white mb-2">Presque ! Rejoins ta ligue</h2>
+                <input className="input uppercase tracking-widest text-center text-lg font-bold"
+                  placeholder="Code de ligue" value={code} onChange={e => setCode(e.target.value)} maxLength={6} />
                 <input className="input" placeholder="Ton pseudo dans la ligue"
                   value={displayName} onChange={e => setDisplayName(e.target.value)} />
-                <button onClick={handleJoin} disabled={loading || !displayName}
+                <button onClick={handleJoin} disabled={loading || !displayName || !code}
                   className="btn-primary w-full py-3">
                   {loading ? 'Connexion…' : 'Rejoindre →'}
                 </button>
