@@ -27,8 +27,6 @@ export default function HomePage() {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) { setChecking(false); return }
 
-        setLoggedIn(true)
-
         // Session valide — trouver sa ligue
         const savedCode = localStorage.getItem(STORAGE_KEY)
         if (savedCode) {
@@ -64,12 +62,15 @@ export default function HomePage() {
             sessionStorage.removeItem(PENDING_KEY)
             setIsCreate(ic)
             if (c) setCode(c)
+            setLoggedIn(true)
             setStep('join_name')
             setChecking(false)
             return
           } catch {}
         }
 
+        // Batché avec setChecking pour garantir un seul rendu cohérent
+        setLoggedIn(true)
         setChecking(false)
       } catch {
         setChecking(false)
