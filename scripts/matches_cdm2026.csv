@@ -1,0 +1,105 @@
+fixture_id,round,phase,home_team,away_team,match_date
+100001,Group Stage - 1,poule,Mexico,South Africa,2026-06-11T19:00:00Z
+100002,Group Stage - 1,poule,USA,Colombia,2026-06-12T00:00:00Z
+100003,Group Stage - 1,poule,Ecuador,Bolivia,2026-06-12T19:00:00Z
+100004,Group Stage - 1,poule,Canada,Wales,2026-06-12T23:00:00Z
+100005,Group Stage - 1,poule,Argentina,Ivory Coast,2026-06-13T00:00:00Z
+100006,Group Stage - 1,poule,Spain,Brazil,2026-06-13T19:00:00Z
+100007,Group Stage - 1,poule,Germany,Japan,2026-06-13T23:00:00Z
+100008,Group Stage - 1,poule,France,Saudi Arabia,2026-06-14T00:00:00Z
+100009,Group Stage - 1,poule,England,Algeria,2026-06-14T19:00:00Z
+100010,Group Stage - 1,poule,Netherlands,Senegal,2026-06-14T23:00:00Z
+100011,Group Stage - 1,poule,Portugal,Morocco,2026-06-15T00:00:00Z
+100012,Group Stage - 1,poule,Belgium,Australia,2026-06-15T19:00:00Z
+100013,Group Stage - 1,poule,Croatia,Uruguay,2026-06-15T23:00:00Z
+100014,Group Stage - 1,poule,Switzerland,South Korea,2026-06-16T00:00:00Z
+100015,Group Stage - 1,poule,Norway,Poland,2026-06-16T19:00:00Z
+100016,Group Stage - 1,poule,Austria,Turkey,2026-06-16T23:00:00Z
+100017,Group Stage - 1,poule,Scotland,Bosnia,2026-06-17T00:00:00Z
+100018,Group Stage - 1,poule,Czech Republic,Haiti,2026-06-17T19:00:00Z
+100019,Group Stage - 1,poule,Serbia,Ghana,2026-06-17T23:00:00Z
+100020,Group Stage - 1,poule,Iran,Qatar,2026-06-18T00:00:00Z
+100021,Group Stage - 1,poule,Egypt,New Zealand,2026-06-18T19:00:00Z
+100022,Group Stage - 1,poule,Senegal,DR Congo,2026-06-18T23:00:00Z
+100023,Group Stage - 1,poule,Tunisia,Uzbekistan,2026-06-19T00:00:00Z
+100024,Group Stage - 1,poule,Georgia,Jordan,2026-06-19T19:00:00Z
+100025,Group Stage - 2,poule,South Africa,USA,2026-06-16T19:00:00Z
+100026,Group Stage - 2,poule,Colombia,Mexico,2026-06-16T23:00:00Z
+100027,Group Stage - 2,poule,Wales,Ecuador,2026-06-17T00:00:00Z
+100028,Group Stage - 2,poule,Bolivia,Canada,2026-06-17T19:00:00Z
+100029,Group Stage - 2,poule,Ivory Coast,Spain,2026-06-17T23:00:00Z
+100030,Group Stage - 2,poule,Brazil,Argentina,2026-06-18T00:00:00Z
+100031,Group Stage - 2,poule,Japan,France,2026-06-18T19:00:00Z
+100032,Group Stage - 2,poule,Saudi Arabia,Germany,2026-06-18T23:00:00Z
+100033,Group Stage - 2,poule,Algeria,Netherlands,2026-06-19T00:00:00Z
+100034,Group Stage - 2,poule,Senegal,England,2026-06-19T19:00:00Z
+100035,Group Stage - 2,poule,Morocco,Belgium,2026-06-20T00:00:00Z
+100036,Group Stage - 2,poule,Portugal,Croatia,2026-06-20T19:00:00Z
+100037,Group Stage - 2,poule,Uruguay,Switzerland,2026-06-20T23:00:00Z
+100038,Group Stage - 2,poule,South Korea,Norway,2026-06-21T00:00:00Z
+100039,Group Stage - 2,poule,Poland,Austria,2026-06-21T19:00:00Z
+100040,Group Stage - 2,poule,Turkey,Scotland,2026-06-21T23:00:00Z
+100041,Group Stage - 2,poule,Bosnia,Czech Republic,2026-06-22T00:00:00Z
+100042,Group Stage - 2,poule,Haiti,Serbia,2026-06-22T19:00:00Z
+100043,Group Stage - 2,poule,Ghana,Iran,2026-06-22T23:00:00Z
+100044,Group Stage - 2,poule,Qatar,Egypt,2026-06-23T00:00:00Z
+100045,Group Stage - 2,poule,New Zealand,Tunisia,2026-06-23T19:00:00Z
+100046,Group Stage - 2,poule,DR Congo,Georgia,2026-06-23T23:00:00Z
+100047,Group Stage - 2,poule,Jordan,Senegal,2026-06-24T00:00:00Z
+100048,Group Stage - 2,poule,Uzbekistan,Cameroon,2026-06-24T19:00:00Z
+100049,Group Stage - 3,poule,USA,Mexico,2026-06-22T23:00:00Z
+100050,Group Stage - 3,poule,Colombia,South Africa,2026-06-22T23:00:00Z
+100051,Group Stage - 3,poule,Ecuador,Canada,2026-06-26T23:00:00Z
+100052,Group Stage - 3,poule,Bolivia,Wales,2026-06-26T23:00:00Z
+100053,Group Stage - 3,poule,Argentina,Brazil,2026-06-26T19:00:00Z
+100054,Group Stage - 3,poule,Spain,Ivory Coast,2026-06-26T19:00:00Z
+100055,Group Stage - 3,poule,Germany,France,2026-06-27T23:00:00Z
+100056,Group Stage - 3,poule,Japan,Saudi Arabia,2026-06-27T23:00:00Z
+100057,Group Stage - 3,poule,England,Netherlands,2026-06-27T19:00:00Z
+100058,Group Stage - 3,poule,Algeria,Senegal,2026-06-27T19:00:00Z
+100059,Group Stage - 3,poule,Portugal,Belgium,2026-06-28T23:00:00Z
+100060,Group Stage - 3,poule,Morocco,Croatia,2026-06-28T23:00:00Z
+100061,Group Stage - 3,poule,Switzerland,Uruguay,2026-06-28T19:00:00Z
+100062,Group Stage - 3,poule,South Korea,Poland,2026-06-29T23:00:00Z
+100063,Group Stage - 3,poule,Norway,Austria,2026-06-29T23:00:00Z
+100064,Group Stage - 3,poule,Turkey,Bosnia,2026-06-29T19:00:00Z
+100065,Group Stage - 3,poule,Scotland,Czech Republic,2026-06-29T19:00:00Z
+100066,Group Stage - 3,poule,Serbia,Haiti,2026-06-30T23:00:00Z
+100067,Group Stage - 3,poule,Iran,Ghana,2026-06-30T23:00:00Z
+100068,Group Stage - 3,poule,Egypt,Qatar,2026-06-30T19:00:00Z
+100069,Group Stage - 3,poule,New Zealand,Uzbekistan,2026-06-30T19:00:00Z
+100070,Group Stage - 3,poule,DR Congo,Jordan,2026-07-01T23:00:00Z
+100071,Group Stage - 3,poule,Georgia,Senegal,2026-07-01T23:00:00Z
+100072,Round of 32 - Match 1,huitieme,TBD,TBD,2026-07-03T19:00:00Z
+100073,Round of 32 - Match 2,huitieme,TBD,TBD,2026-07-03T23:00:00Z
+100074,Round of 32 - Match 3,huitieme,TBD,TBD,2026-07-04T19:00:00Z
+100075,Round of 32 - Match 4,huitieme,TBD,TBD,2026-07-04T23:00:00Z
+100076,Round of 32 - Match 5,huitieme,TBD,TBD,2026-07-05T19:00:00Z
+100077,Round of 32 - Match 6,huitieme,TBD,TBD,2026-07-05T23:00:00Z
+100078,Round of 32 - Match 7,huitieme,TBD,TBD,2026-07-06T19:00:00Z
+100079,Round of 32 - Match 8,huitieme,TBD,TBD,2026-07-06T23:00:00Z
+100080,Round of 32 - Match 9,huitieme,TBD,TBD,2026-07-07T19:00:00Z
+100081,Round of 32 - Match 10,huitieme,TBD,TBD,2026-07-07T23:00:00Z
+100082,Round of 32 - Match 11,huitieme,TBD,TBD,2026-07-08T19:00:00Z
+100083,Round of 32 - Match 12,huitieme,TBD,TBD,2026-07-08T23:00:00Z
+100084,Round of 32 - Match 13,huitieme,TBD,TBD,2026-07-09T19:00:00Z
+100085,Round of 32 - Match 14,huitieme,TBD,TBD,2026-07-09T23:00:00Z
+100086,Round of 32 - Match 15,huitieme,TBD,TBD,2026-07-10T19:00:00Z
+100087,Round of 32 - Match 16,huitieme,TBD,TBD,2026-07-10T23:00:00Z
+100088,Round of 16 - Match 1,quart,TBD,TBD,2026-07-12T19:00:00Z
+100089,Round of 16 - Match 2,quart,TBD,TBD,2026-07-12T23:00:00Z
+100090,Round of 16 - Match 3,quart,TBD,TBD,2026-07-13T19:00:00Z
+100091,Round of 16 - Match 4,quart,TBD,TBD,2026-07-13T23:00:00Z
+100092,Round of 16 - Match 5,quart,TBD,TBD,2026-07-14T19:00:00Z
+100093,Round of 16 - Match 6,quart,TBD,TBD,2026-07-14T23:00:00Z
+100094,Round of 16 - Match 7,quart,TBD,TBD,2026-07-15T19:00:00Z
+100095,Round of 16 - Match 8,quart,TBD,TBD,2026-07-15T23:00:00Z
+100096,Semi-final - Match 1,demi,TBD,TBD,2026-07-16T23:00:00Z
+100097,Semi-final - Match 2,demi,TBD,TBD,2026-07-17T23:00:00Z
+100098,Semi-final - Match 3,demi,TBD,TBD,2026-07-18T19:00:00Z
+100099,Semi-final - Match 4,demi,TBD,TBD,2026-07-18T23:00:00Z
+100100,Quarter-final - Match 1,quart,TBD,TBD,2026-07-19T19:00:00Z
+100101,Quarter-final - Match 2,quart,TBD,TBD,2026-07-19T23:00:00Z
+100102,Quarter-final - Match 3,quart,TBD,TBD,2026-07-20T19:00:00Z
+100103,Quarter-final - Match 4,quart,TBD,TBD,2026-07-20T23:00:00Z
+100104,Final,finale,TBD,TBD,2026-07-19T20:00:00Z

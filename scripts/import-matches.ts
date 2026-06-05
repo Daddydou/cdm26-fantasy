@@ -3,17 +3,10 @@ import { config } from "dotenv"
 import { resolve } from "path"
 config({ path: resolve(process.cwd(), ".env.local") })
 
-
 /**
- * Import du calendrier CDM 2026 depuis SofaScore
+ * Import du calendrier CDM 2026 via API-Football
  * Usage : npx tsx scripts/import-matches.ts
- *
- * CDM 2026 : 11 juin – 19 juillet 2026
- * SofaScore tournament ID CDM 2026 : à confirmer (était 2 pour CDM 2022)
- *
- * Variables :
- *   NEXT_PUBLIC_SUPABASE_URL
- *   SUPABASE_SERVICE_ROLE_KEY
+ * league=1, season=2026 — gratuit 100 req/jour
  */
 
 import { createClient } from '@supabase/supabase-js'
@@ -24,92 +17,75 @@ const supabase = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
 
-const SOFASCORE_BASE = 'https://api.sofascore.com/api/v1'
-const HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-  'Accept': 'application/json',
-  'Referer': 'https://www.sofascore.com/',
-}
+const API_KEY  = process.env.API_FOOTBALL_KEY!
+const BASE_URL = 'https://v3.football.api-sports.io'
+const LEAGUE   = 1
+const SEASON   = 2026
 
-// CDM 2026 SofaScore : tournament=16 (FIFA World Cup), season à confirmer
-// Endpoint pour récupérer les rounds : /unique-tournament/16/season/{seasonId}/events/round/1
-// À mettre à jour une fois la season ID connue sur SofaScore
-const TOURNAMENT_ID = 16   // FIFA World Cup sur SofaScore
-const SEASON_ID    = 61644 // ⚠️  À CONFIRMER — valeur CDM 2026
+const HEADERS  = { 'x-apisports-key': API_KEY }
 
 function inferPhase(round: string): string {
-  if (round.includes('Group') || round.toLowerCase().includes('poule')) return 'poule'
-  if (round.includes('Round of 16') || round.includes('8')) return 'huitieme'
-  if (round.includes('Quarter')) return 'quart'
-  if (round.includes('Semi')) return 'demi'
-  if (round.includes('Final') && !round.includes('Semi') && !round.includes('Third')) return 'finale'
+  const r = round.toLowerCase()
+  if (r.includes('group'))                               return 'poule'
+  if (r.includes('round of 32') || r.includes('of 32')) return 'huitieme'
+  if (r.includes('round of 16') || r.includes('of 16')) return 'huitieme'
+  if (r.includes('quarter'))                             return 'quart'
+  if (r.includes('semi'))                                return 'demi'
+  if (r.includes('final') && !r.includes('semi') && !r.includes('third')) return 'finale'
   return 'poule'
 }
 
-async function fetchRound(roundNum: number) {
-  try {
-    const res = await fetch(
-      `${SOFASCORE_BASE}/unique-tournament/${TOURNAMENT_ID}/season/${SEASON_ID}/events/round/${roundNum}`,
-      { headers: HEADERS, signal: AbortSignal.timeout(15000) }
-    )
-    if (!res.ok) return null
-    const data = await res.json()
-    return data.events || []
-  } catch {
-    return null
-  }
-}
-
 async function main() {
-  console.log(`🌍  Import calendrier CDM 2026\n`)
-  console.log(`⚠️   Tournament ID: ${TOURNAMENT_ID}, Season ID: ${SEASON_ID}`)
-  console.log(`    Vérifier sur https://api.sofascore.com/api/v1/unique-tournament/${TOURNAMENT_ID}/seasons\n`)
+  console.log('\n🌍  Import calendrier CDM 2026 via API-Football\n')
+  if (!API_KEY) { console.error('❌  API_FOOTBALL_KEY manquante'); process.exit(1) }
 
-  let totalInserted = 0
-  let totalSkipped = 0
+  // Récupérer les rounds
+  const roundsRes = await fetch(
+    `${BASE_URL}/fixtures/rounds?league=${LEAGUE}&season=${SEASON}`,
+    { headers: HEADERS }
+  )
+  const roundsData = await roundsRes.json()
+  const rounds: string[] = roundsData.response || []
+  console.log(`📋  ${rounds.length} rounds trouvés`)
 
-  // CDM 2026 : phase de poule = rounds 1-3, puis élimination directe
-  for (let round = 1; round <= 8; round++) {
-    console.log(`📅  Round ${round}...`)
-    const events = await fetchRound(round)
+  let total = 0
 
-    if (!events || events.length === 0) {
-      console.log(`   Aucun match (fin des rounds ou erreur)`)
-      if (round > 3) break
-      continue
-    }
+  for (const round of rounds) {
+    process.stdout.write(`📅  ${round}... `)
 
-    const matchesToInsert = events.map((ev: {
-      id: number
-      roundInfo?: { name?: string }
-      startTimestamp: number
-      homeTeam: { name: string }
-      awayTeam: { name: string }
+    const res = await fetch(
+      `${BASE_URL}/fixtures?league=${LEAGUE}&season=${SEASON}&round=${encodeURIComponent(round)}`,
+      { headers: HEADERS }
+    )
+    const data = await res.json()
+    const fixtures = data.response || []
+
+    if (!fixtures.length) { console.log('vide'); continue }
+
+    const rows = fixtures.map((f: {
+      fixture: { id: number; date: string }
+      teams: { home: { name: string }; away: { name: string } }
     }) => ({
-      sofascore_match_id: String(ev.id),
-      phase: inferPhase(ev.roundInfo?.name || `Round ${round}`),
-      round: ev.roundInfo?.name || `Round ${round}`,
-      home_team: ev.homeTeam.name,
-      away_team: ev.awayTeam.name,
-      match_date: new Date(ev.startTimestamp * 1000).toISOString(),
+      sofascore_match_id: String(f.fixture.id),
+      phase: inferPhase(round),
+      round,
+      home_team: f.teams.home.name,
+      away_team: f.teams.away.name,
+      match_date: f.fixture.date,
       processed: false,
     }))
 
     const { error } = await supabase
       .from('fantasy_matches')
-      .upsert(matchesToInsert, { onConflict: 'sofascore_match_id', ignoreDuplicates: true })
+      .upsert(rows, { onConflict: 'sofascore_match_id', ignoreDuplicates: true })
 
-    if (error) {
-      console.error(`   ❌  Erreur : ${error.message}`)
-    } else {
-      console.log(`   ✅  ${matchesToInsert.length} matchs insérés`)
-      totalInserted += matchesToInsert.length
-    }
+    if (error) { console.log(`❌ ${error.message}`) }
+    else { console.log(`✅ ${rows.length} matchs`); total += rows.length }
 
-    await new Promise(r => setTimeout(r, 1500))
+    await new Promise(r => setTimeout(r, 400))
   }
 
-  console.log(`\n✅  Import terminé : ${totalInserted} matchs, ${totalSkipped} ignorés`)
+  console.log(`\n✅  Total : ${total} matchs importés`)
 }
 
 main().catch(console.error)

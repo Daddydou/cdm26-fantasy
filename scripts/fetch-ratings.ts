@@ -3,18 +3,14 @@ import { config } from "dotenv"
 import { resolve } from "path"
 config({ path: resolve(process.cwd(), ".env.local") })
 
-
 /**
- * Scraper SofaScore — notes joueurs CDM26
- * Usage : npx tsx scripts/fetch-ratings.ts [sofascore_match_id]
- *   Sans argument : traite tous les matchs non-processés
+ * Scraper notes joueurs CDM 2026 via API-Football
+ * Usage :
+ *   npx tsx scripts/fetch-ratings.ts           → tous les matchs non processés
+ *   npx tsx scripts/fetch-ratings.ts [match_id] → un match précis (ID API-Football)
  *
- * L'API SofaScore n'est pas officielle mais stable.
- * Endpoint : https://api.sofascore.com/api/v1/event/{id}/lineups
- *
- * Variables d'environnement :
- *   NEXT_PUBLIC_SUPABASE_URL
- *   SUPABASE_SERVICE_ROLE_KEY
+ * API-Football : /fixtures/players?fixture=ID&league=1&season=2026
+ * Gratuit : 100 req/jour
  */
 
 import { createClient } from '@supabase/supabase-js'
@@ -25,49 +21,21 @@ const supabase = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
 
-const SOFASCORE_BASE = 'https://api.sofascore.com/api/v1'
-const HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-  'Accept': 'application/json',
-  'Referer': 'https://www.sofascore.com/',
-}
-const DELAY_MS = 2000 // respecte le rate-limit SofaScore
+const API_KEY  = process.env.API_FOOTBALL_KEY!
+const BASE_URL = 'https://v3.football.api-sports.io'
+const HEADERS  = { 'x-apisports-key': API_KEY }
+const DELAY_MS = 1200 // respecte 100 req/min
 
-interface SofaPlayer {
-  player: {
-    id: number
-    name: string
-  }
-  statistics?: {
-    rating?: number
-    minutesPlayed?: number
-  }
-}
+async function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)) }
 
-interface SofaLineup {
-  home: { players: SofaPlayer[] }
-  away: { players: SofaPlayer[] }
-}
-
-async function sleep(ms: number) {
-  return new Promise(r => setTimeout(r, ms))
-}
-
-async function fetchMatchLineup(sofascoreMatchId: string): Promise<SofaLineup | null> {
-  try {
-    const res = await fetch(
-      `${SOFASCORE_BASE}/event/${sofascoreMatchId}/lineups`,
-      { headers: HEADERS, signal: AbortSignal.timeout(15000) }
-    )
-    if (!res.ok) {
-      console.error(`  HTTP ${res.status} pour match ${sofascoreMatchId}`)
-      return null
-    }
-    return await res.json()
-  } catch (e) {
-    console.error(`  Erreur fetch match ${sofascoreMatchId} :`, (e as Error).message)
-    return null
-  }
+async function fetchMatchRatings(fixtureId: string) {
+  const res = await fetch(
+    `${BASE_URL}/fixtures/players?fixture=${fixtureId}`,
+    { headers: HEADERS, signal: AbortSignal.timeout(15000) }
+  )
+  if (!res.ok) { console.error(`  HTTP ${res.status}`); return null }
+  const data = await res.json()
+  return data.response || null
 }
 
 async function processMatch(match: {
@@ -77,110 +45,99 @@ async function processMatch(match: {
   home_team: string
   away_team: string
 }) {
-  console.log(`\n⚽  ${match.home_team} vs ${match.away_team} (${match.sofascore_match_id})`)
+  console.log(`\n⚽  ${match.home_team} vs ${match.away_team}`)
 
-  const lineup = await fetchMatchLineup(match.sofascore_match_id)
-  if (!lineup) {
-    console.log('  ❌  Lineup non disponible')
+  const response = await fetchMatchRatings(match.sofascore_match_id)
+  if (!response || response.length === 0) {
+    console.log('  ❌  Données non disponibles')
     return false
   }
 
-  const allPlayers: SofaPlayer[] = [
-    ...(lineup.home?.players || []),
-    ...(lineup.away?.players || []),
-  ]
-
-  console.log(`  👥  ${allPlayers.length} joueurs trouvés`)
-
-  // Récupérer les sofascore_id des joueurs de notre DB
+  // Récupérer les joueurs DB avec leur nom pour matching
   const { data: dbPlayers } = await supabase
     .from('fantasy_players')
-    .select('id, sofascore_id, name')
-    .not('sofascore_id', 'is', null)
+    .select('id, name, sofascore_id')
 
   if (!dbPlayers) return false
 
-  const dbMap = new Map(dbPlayers.map(p => [p.sofascore_id, p]))
+  // Index par sofascore_id ET par nom normalisé
+  const byId   = new Map(dbPlayers.filter(p => p.sofascore_id).map(p => [p.sofascore_id, p]))
+  const byName = new Map(dbPlayers.map(p => [p.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''), p]))
 
-  let matched = 0
   const scoresToInsert = []
+  let matched = 0
 
-  for (const sp of allPlayers) {
-    const sofaId = String(sp.player.id)
-    const dbPlayer = dbMap.get(sofaId)
+  for (const team of response) {
+    for (const playerData of (team.players || [])) {
+      const p = playerData.player
+      const stats = playerData.statistics?.[0]
+      if (!stats) continue
 
-    if (!dbPlayer) continue
-    if (!sp.statistics?.rating) continue
+      const rating = parseFloat(stats.games?.rating) || null
+      const minutes = stats.games?.minutes || 0
+      if (!rating) continue
 
-    scoresToInsert.push({
-      player_id: dbPlayer.id,
-      match_id: match.id,
-      sofascore_match_id: match.sofascore_match_id,
-      rating: sp.statistics.rating,
-      minutes_played: sp.statistics.minutesPlayed || 0,
-      match_date: match.match_date,
-    })
-    matched++
+      // Cherche par ID API-Football d'abord, puis par nom
+      let dbPlayer = byId.get(String(p.id))
+      if (!dbPlayer) {
+        const normName = p.name?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        dbPlayer = byName.get(normName)
+      }
+      if (!dbPlayer) continue
+
+      scoresToInsert.push({
+        player_id: dbPlayer.id,
+        match_id: match.id,
+        sofascore_match_id: match.sofascore_match_id,
+        rating,
+        minutes_played: minutes,
+        match_date: match.match_date,
+      })
+      matched++
+    }
   }
 
   if (scoresToInsert.length > 0) {
     const { error } = await supabase
       .from('fantasy_scores')
       .upsert(scoresToInsert, { onConflict: 'player_id,match_id' })
-
-    if (error) {
-      console.error('  ❌  Erreur insert scores :', error.message)
-      return false
-    }
+    if (error) { console.error('  ❌', error.message); return false }
   }
 
-  // Marquer le match comme processé
-  await supabase
-    .from('fantasy_matches')
-    .update({ processed: true })
-    .eq('id', match.id)
-
+  await supabase.from('fantasy_matches').update({ processed: true }).eq('id', match.id)
   console.log(`  ✅  ${matched} joueurs matchés, ${scoresToInsert.length} notes enregistrées`)
   return true
 }
 
 async function main() {
+  if (!API_KEY) { console.error('❌  API_FOOTBALL_KEY manquante'); process.exit(1) }
+
   const specificId = process.argv[2]
 
   if (specificId) {
-    // Mode single match
     const { data: match } = await supabase
       .from('fantasy_matches')
       .select()
       .eq('sofascore_match_id', specificId)
       .single()
-
-    if (!match) {
-      console.error(`❌  Match ${specificId} non trouvé en base`)
-      process.exit(1)
-    }
-
+    if (!match) { console.error(`❌  Match ${specificId} non trouvé`); process.exit(1) }
     await processMatch(match)
   } else {
-    // Mode batch — tous les matchs non processés
+    const now = new Date().toISOString()
     const { data: matches } = await supabase
       .from('fantasy_matches')
       .select()
       .eq('processed', false)
+      .lt('match_date', now)
       .order('match_date', { ascending: true })
 
-    if (!matches || matches.length === 0) {
-      console.log('✅  Aucun match à traiter')
-      return
-    }
-
+    if (!matches || matches.length === 0) { console.log('✅  Aucun match à traiter'); return }
     console.log(`🔄  ${matches.length} matchs à traiter`)
 
     for (const match of matches) {
       await processMatch(match)
       await sleep(DELAY_MS)
     }
-
     console.log('\n✅  Batch terminé')
   }
 }
