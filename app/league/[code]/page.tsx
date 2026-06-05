@@ -156,6 +156,22 @@ export default function LeaguePage() {
         </Link>
       </div>
 
+      {/* Actions compte */}
+      <div className="flex justify-center gap-4 mb-6">
+        <button
+          onClick={() => { localStorage.removeItem('cdm26_league'); router.push('/') }}
+          className="text-xs text-white/30 hover:text-white/60 transition-colors"
+        >
+          ⇄ Changer de ligue
+        </button>
+        <button
+          onClick={async () => { await supabase.auth.signOut(); router.push('/') }}
+          className="text-xs text-white/20 hover:text-red-400 transition-colors"
+        >
+          ↩ Quitter
+        </button>
+      </div>
+
       {/* Mini classement */}
       {standings.length > 0 && (
         <div className="card">
