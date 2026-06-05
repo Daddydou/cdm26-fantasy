@@ -16,7 +16,7 @@ export type PricePhase = 'initial' | 'post_poule' | 'post_8' | 'post_quart' | 'p
 export type Database = {
   public: {
     Tables: {
-      cdm_players: {
+      fantasy_players: {
         Row: {
           id: string
           name: string
@@ -29,10 +29,10 @@ export type Database = {
           active: boolean
           created_at: string
         }
-        Insert: Omit<Database['public']['Tables']['cdm_players']['Row'], 'id' | 'created_at'>
-        Update: Partial<Database['public']['Tables']['cdm_players']['Insert']>
+        Insert: Omit<Database['public']['Tables']['fantasy_players']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['fantasy_players']['Insert']>
       }
-      cdm_teams: {
+      fantasy_teams: {
         Row: {
           id: string
           name: string
@@ -40,10 +40,10 @@ export type Database = {
           team_score: number | null
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['cdm_teams']['Row'], 'id' | 'updated_at'>
-        Update: Partial<Database['public']['Tables']['cdm_teams']['Insert']>
+        Insert: Omit<Database['public']['Tables']['fantasy_teams']['Row'], 'id' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['fantasy_teams']['Insert']>
       }
-      cdm_prices: {
+      fantasy_prices: {
         Row: {
           id: string
           player_id: string
@@ -52,10 +52,10 @@ export type Database = {
           price: number
           computed_at: string
         }
-        Insert: Omit<Database['public']['Tables']['cdm_prices']['Row'], 'id' | 'computed_at'>
-        Update: Partial<Database['public']['Tables']['cdm_prices']['Insert']>
+        Insert: Omit<Database['public']['Tables']['fantasy_prices']['Row'], 'id' | 'computed_at'>
+        Update: Partial<Database['public']['Tables']['fantasy_prices']['Insert']>
       }
-      cdm_leagues: {
+      fantasy_leagues: {
         Row: {
           id: string
           name: string
@@ -67,10 +67,10 @@ export type Database = {
           market_open: boolean
           created_at: string
         }
-        Insert: Omit<Database['public']['Tables']['cdm_leagues']['Row'], 'id' | 'created_at'>
-        Update: Partial<Database['public']['Tables']['cdm_leagues']['Insert']>
+        Insert: Omit<Database['public']['Tables']['fantasy_leagues']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['fantasy_leagues']['Insert']>
       }
-      cdm_participants: {
+      fantasy_participants: {
         Row: {
           id: string
           league_id: string
@@ -79,10 +79,10 @@ export type Database = {
           budget_remaining: number
           joined_at: string
         }
-        Insert: Omit<Database['public']['Tables']['cdm_participants']['Row'], 'id' | 'joined_at'>
-        Update: Partial<Database['public']['Tables']['cdm_participants']['Insert']>
+        Insert: Omit<Database['public']['Tables']['fantasy_participants']['Row'], 'id' | 'joined_at'>
+        Update: Partial<Database['public']['Tables']['fantasy_participants']['Insert']>
       }
-      cdm_squads: {
+      fantasy_squads: {
         Row: {
           id: string
           league_id: string
@@ -96,10 +96,10 @@ export type Database = {
           active: boolean
           created_at: string
         }
-        Insert: Omit<Database['public']['Tables']['cdm_squads']['Row'], 'id' | 'created_at'>
-        Update: Partial<Database['public']['Tables']['cdm_squads']['Insert']>
+        Insert: Omit<Database['public']['Tables']['fantasy_squads']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['fantasy_squads']['Insert']>
       }
-      cdm_matches: {
+      fantasy_matches: {
         Row: {
           id: string
           sofascore_match_id: string
@@ -111,10 +111,10 @@ export type Database = {
           processed: boolean
           created_at: string
         }
-        Insert: Omit<Database['public']['Tables']['cdm_matches']['Row'], 'id' | 'created_at'>
-        Update: Partial<Database['public']['Tables']['cdm_matches']['Insert']>
+        Insert: Omit<Database['public']['Tables']['fantasy_matches']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['fantasy_matches']['Insert']>
       }
-      cdm_scores: {
+      fantasy_scores: {
         Row: {
           id: string
           player_id: string
@@ -125,12 +125,12 @@ export type Database = {
           match_date: string | null
           fetched_at: string
         }
-        Insert: Omit<Database['public']['Tables']['cdm_scores']['Row'], 'id' | 'fetched_at'>
-        Update: Partial<Database['public']['Tables']['cdm_scores']['Insert']>
+        Insert: Omit<Database['public']['Tables']['fantasy_scores']['Row'], 'id' | 'fetched_at'>
+        Update: Partial<Database['public']['Tables']['fantasy_scores']['Insert']>
       }
     }
     Views: {
-      cdm_standings: {
+      fantasy_standings: {
         Row: {
           league_id: string
           participant_id: string
@@ -142,7 +142,7 @@ export type Database = {
           value_for_money: number
         }
       }
-      cdm_squad_detail: {
+      fantasy_squad_detail: {
         Row: {
           league_id: string
           participant_id: string
@@ -165,16 +165,16 @@ export type Database = {
 }
 
 // Helpers
-export type Player = Database['public']['Tables']['cdm_players']['Row']
-export type Team = Database['public']['Tables']['cdm_teams']['Row']
-export type Price = Database['public']['Tables']['cdm_prices']['Row']
-export type League = Database['public']['Tables']['cdm_leagues']['Row']
-export type Participant = Database['public']['Tables']['cdm_participants']['Row']
-export type Squad = Database['public']['Tables']['cdm_squads']['Row']
-export type Match = Database['public']['Tables']['cdm_matches']['Row']
-export type Score = Database['public']['Tables']['cdm_scores']['Row']
-export type Standing = Database['public']['Views']['cdm_standings']['Row']
-export type SquadDetail = Database['public']['Views']['cdm_squad_detail']['Row']
+export type Player = Database['public']['Tables']['fantasy_players']['Row']
+export type Team = Database['public']['Tables']['fantasy_teams']['Row']
+export type Price = Database['public']['Tables']['fantasy_prices']['Row']
+export type League = Database['public']['Tables']['fantasy_leagues']['Row']
+export type Participant = Database['public']['Tables']['fantasy_participants']['Row']
+export type Squad = Database['public']['Tables']['fantasy_squads']['Row']
+export type Match = Database['public']['Tables']['fantasy_matches']['Row']
+export type Score = Database['public']['Tables']['fantasy_scores']['Row']
+export type Standing = Database['public']['Views']['fantasy_standings']['Row']
+export type SquadDetail = Database['public']['Views']['fantasy_squad_detail']['Row']
 
 // Player avec prix courant (utilisé partout dans l'UI)
 export type PlayerWithPrice = Player & {
