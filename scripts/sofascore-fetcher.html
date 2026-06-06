@@ -65,8 +65,8 @@
 
   <script>
     const CDM_ID = 16
-    const API = 'http://localhost:3000/api/admin/import-from-browser'
-    const SOFA = 'https://api.sofascore.com/api/v1'
+    const API   = 'http://localhost:3000/api/admin/import-from-browser'
+    const PROXY = 'http://localhost:3000/api/admin/sofascore-proxy'
 
     const logEl  = document.getElementById('log')
     const btn    = document.getElementById('btn')
@@ -87,9 +87,13 @@
       logEl.appendChild(document.createElement('hr'))
     }
 
-    async function safeFetch(url) {
-      const r = await fetch(url, { headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' } })
-      if (!r.ok) throw new Error(`HTTP ${r.status} — ${url}`)
+    async function sofaFetch(sofaUrl) {
+      const proxied = `${PROXY}?url=${encodeURIComponent(sofaUrl)}`
+      const r = await fetch(proxied)
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}))
+        throw new Error(err.error || `HTTP ${r.status}`)
+      }
       return r.json()
     }
 
@@ -107,7 +111,7 @@
         // ── 1. Matchs du jour ──────────────────────────────────────────────
         log(`🔍 Récupération des matchs CDM du <strong>${date}</strong>…`)
 
-        const evData = await safeFetch(`${SOFA}/sport/football/scheduled-events/${date}`)
+        const evData = await sofaFetch(`https://api.sofascore.com/api/v1/sport/football/scheduled-events/${date}`)
         const allEvents = evData.events || []
         const cdmEvents = allEvents.filter(e => e.tournament?.uniqueTournament?.id === CDM_ID)
 
@@ -133,7 +137,7 @@
 
           let linData
           try {
-            linData = await safeFetch(`${SOFA}/event/${ev.id}/lineups`)
+            linData = await sofaFetch(`https://api.sofascore.com/api/v1/event/${ev.id}/lineups`)
           } catch (e) {
             log(`  ⚠️ Lineups indisponibles : ${e.message}`, 'warn')
             continue
