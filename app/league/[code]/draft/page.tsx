@@ -69,7 +69,8 @@ export default function DraftPage() {
 
       const enriched: PlayerWithPrice[] = (playersData || []).map((p: Player & { fantasy_prices?: { price: number; phase: string }[] }) => {
         const priceRow = p.fantasy_prices?.find((pr) => pr.phase === pricePhase)
-        return { ...p, current_price: priceRow?.price || null }
+          ?? p.fantasy_prices?.find((pr) => pr.phase === 'initial')
+        return { ...p, current_price: priceRow?.price ?? null }
       })
       setPlayers(enriched)
       setLoading(false)
