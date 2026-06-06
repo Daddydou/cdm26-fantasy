@@ -109,10 +109,16 @@ export default function HistoryPage() {
 
   if (loading) return <Loading />
 
+  const marketIsOpen = !!(league?.draft_open || league?.market_open)
+
   const teams = [...new Set(transfers.map(t => t.team))].sort()
 
   let filtered = [...transfers]
-  if (participantFilter !== 'all') filtered = filtered.filter(t => t.participant_id === participantFilter)
+  if (marketIsOpen) {
+    filtered = filtered.filter(t => t.participant_id === me?.id)
+  } else if (participantFilter !== 'all') {
+    filtered = filtered.filter(t => t.participant_id === participantFilter)
+  }
   if (teamFilter !== 'all') filtered = filtered.filter(t => t.team === teamFilter)
   if (sort === 'oldest') filtered.sort((a, b) => a.created_at.localeCompare(b.created_at))
   else if (sort === 'price_desc') filtered.sort((a, b) => b.bought_at_price - a.bought_at_price)
@@ -144,14 +150,22 @@ export default function HistoryPage() {
         <div className="card p-3 text-center"><p className="text-xl font-bold text-white">{Math.round(totalVolume)}</p><p className="text-xs text-white/40">volume cr.</p></div>
       </div>
 
+      {marketIsOpen && (
+        <p className="text-xs text-white/30 mb-3">
+          🔒 Les transferts des autres participants sont masqués pendant le draft / les transferts
+        </p>
+      )}
+
       <div className="space-y-2 mb-2">
-        <select value={participantFilter} onChange={e => setParticipantFilter(e.target.value)} className={selectClass}>
-          <option value="all">Tous les participants</option>
-          {me && <option value={me.id}>Moi ({me.display_name})</option>}
-          {participants.filter(p => p.id !== me?.id).map(p => (
-            <option key={p.id} value={p.id}>{p.display_name}</option>
-          ))}
-        </select>
+        {!marketIsOpen && (
+          <select value={participantFilter} onChange={e => setParticipantFilter(e.target.value)} className={selectClass}>
+            <option value="all">Tous les participants</option>
+            {me && <option value={me.id}>Moi ({me.display_name})</option>}
+            {participants.filter(p => p.id !== me?.id).map(p => (
+              <option key={p.id} value={p.id}>{p.display_name}</option>
+            ))}
+          </select>
+        )}
         <select value={teamFilter} onChange={e => setTeamFilter(e.target.value)} className={selectClass}>
           <option value="all">Toutes les équipes</option>
           {teams.map(t => <option key={t} value={t}>{t}</option>)}
