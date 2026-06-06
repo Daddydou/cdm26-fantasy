@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>SofaScore CDM 2026 — Importeur</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0f0f13; color: #e2e2e8; font-family: system-ui, sans-serif; font-size: 14px; padding: 24px; max-width: 680px; margin: 0 auto; }
+    h1 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+    .subtitle { color: #6b6b80; font-size: 13px; margin-bottom: 24px; }
+    .controls { display: flex; gap: 10px; align-items: center; margin-bottom: 20px; flex-wrap: wrap; }
+    label { color: #9999aa; font-size: 13px; }
+    input[type="date"] { background: #1a1a24; border: 1px solid #2a2a38; color: #e2e2e8; padding: 8px 12px; border-radius: 8px; font-size: 14px; outline: none; }
+    input[type="date"]:focus { border-color: #6366f1; }
+    button { background: #6366f1; color: #fff; border: none; padding: 9px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+    button:hover:not(:disabled) { background: #4f52d9; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    #log { background: #13131c; border: 1px solid #22222e; border-radius: 10px; padding: 16px; min-height: 120px; max-height: 480px; overflow-y: auto; font-size: 13px; line-height: 1.7; }
+    #log:empty::before { content: 'Les logs apparaîtront ici…'; color: #44445a; }
+    .ok   { color: #4ade80; }
+    .warn { color: #facc15; }
+    .err  { color: #f87171; }
+    .dim  { color: #6b6b80; }
+    .bold { font-weight: 700; }
+    hr { border: none; border-top: 1px solid #22222e; margin: 10px 0; }
+    .summary { margin-top: 16px; background: #13131c; border: 1px solid #22222e; border-radius: 10px; padding: 16px; display: none; }
+    .summary.visible { display: block; }
+    .summary h2 { font-size: 14px; margin-bottom: 10px; color: #9999aa; }
+    .stat-row { display: flex; gap: 24px; }
+    .stat { text-align: center; flex: 1; }
+    .stat .n { font-size: 26px; font-weight: 700; color: #fff; }
+    .stat .l { font-size: 12px; color: #6b6b80; margin-top: 2px; }
+    .unmatched { margin-top: 10px; }
+    .unmatched p { color: #facc15; font-size: 12px; margin-bottom: 4px; }
+    .unmatched ul { list-style: none; padding: 0; }
+    .unmatched ul li { color: #9999aa; font-size: 12px; padding: 1px 0; }
+    .unmatched ul li::before { content: '· '; color: #f87171; }
+  </style>
+</head>
+<body>
+  <h1>🏆 SofaScore CDM 2026</h1>
+  <p class="subtitle">Récupère les notes d'une journée et les importe via l'API locale</p>
+
+  <div class="controls">
+    <label>Date :</label>
+    <input type="date" id="dateInput">
+    <button id="btn" onclick="run()">Récupérer les notes CDM</button>
+  </div>
+
+  <div id="log"></div>
+
+  <div class="summary" id="summary">
+    <h2>Résultat de l'import</h2>
+    <div class="stat-row">
+      <div class="stat"><div class="n" id="s-matches">0</div><div class="l">matchs</div></div>
+      <div class="stat"><div class="n" id="s-players">0</div><div class="l">joueurs notés</div></div>
+      <div class="stat"><div class="n" id="s-imported">0</div><div class="l">importés</div></div>
+      <div class="stat"><div class="n" id="s-unmatched">0</div><div class="l">non matchés</div></div>
+    </div>
+    <div class="unmatched" id="unmatched-block" style="display:none">
+      <p>⚠️ Joueurs non matchés :</p>
+      <ul id="unmatched-list"></ul>
+    </div>
+  </div>
+
+  <script>
+    const CDM_ID = 16
+    const API = 'http://localhost:3000/api/admin/import-from-browser'
+    const SOFA = 'https://api.sofascore.com/api/v1'
+
+    const logEl  = document.getElementById('log')
+    const btn    = document.getElementById('btn')
+    const sumEl  = document.getElementById('summary')
+
+    // Default = today
+    document.getElementById('dateInput').value = new Date().toISOString().slice(0, 10)
+
+    function log(html, cls = '') {
+      const d = document.createElement('div')
+      if (cls) d.className = cls
+      d.innerHTML = html
+      logEl.appendChild(d)
+      logEl.scrollTop = logEl.scrollHeight
+    }
+
+    function sep() {
+      logEl.appendChild(document.createElement('hr'))
+    }
+
+    async function safeFetch(url) {
+      const r = await fetch(url, { headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' } })
+      if (!r.ok) throw new Error(`HTTP ${r.status} — ${url}`)
+      return r.json()
+    }
+
+    function delay(ms) { return new Promise(r => setTimeout(r, ms)) }
+
+    async function run() {
+      const date = document.getElementById('dateInput').value
+      if (!date) { alert('Sélectionne une date.'); return }
+
+      logEl.innerHTML = ''
+      sumEl.classList.remove('visible')
+      btn.disabled = true
+
+      try {
+        // ── 1. Matchs du jour ──────────────────────────────────────────────
+        log(`🔍 Récupération des matchs CDM du <strong>${date}</strong>…`)
+
+        const evData = await safeFetch(`${SOFA}/sport/football/scheduled-events/${date}`)
+        const allEvents = evData.events || []
+        const cdmEvents = allEvents.filter(e => e.tournament?.uniqueTournament?.id === CDM_ID)
+
+        if (cdmEvents.length === 0) {
+          log('Aucun match CDM trouvé pour cette date.', 'warn')
+          btn.disabled = false
+          return
+        }
+
+        log(`<span class="ok">✓</span> ${cdmEvents.length} match(s) CDM trouvé(s)`, 'ok')
+        sep()
+
+        // ── 2. Lineups par match ───────────────────────────────────────────
+        const matches = []
+        let totalPlayers = 0
+
+        for (const ev of cdmEvents) {
+          const home = ev.homeTeam?.name || ev.home?.name || '?'
+          const away = ev.awayTeam?.name || ev.away?.name || '?'
+          const startTimestamp = ev.startTimestamp || null
+
+          log(`⚽ <strong>${home} vs ${away}</strong> (id ${ev.id})`)
+
+          let linData
+          try {
+            linData = await safeFetch(`${SOFA}/event/${ev.id}/lineups`)
+          } catch (e) {
+            log(`  ⚠️ Lineups indisponibles : ${e.message}`, 'warn')
+            continue
+          }
+
+          const homePlayers = linData.home?.players || linData.homeTeam?.players || []
+          const awayPlayers = linData.away?.players || linData.awayTeam?.players || []
+
+          const players = []
+
+          for (const p of homePlayers) {
+            const s = p.statistics || {}
+            if (s.rating == null) continue
+            players.push({
+              name: p.player?.name || p.name || '?',
+              team: home,
+              rating: s.rating,
+              goals: s.goals || 0,
+              assists: s.goalAssist || 0,
+              minutes: s.minutesPlayed || 0,
+            })
+          }
+
+          for (const p of awayPlayers) {
+            const s = p.statistics || {}
+            if (s.rating == null) continue
+            players.push({
+              name: p.player?.name || p.name || '?',
+              team: away,
+              rating: s.rating,
+              goals: s.goals || 0,
+              assists: s.goalAssist || 0,
+              minutes: s.minutesPlayed || 0,
+            })
+          }
+
+          log(`  → <span class="ok">${players.length}</span> joueurs avec note`, 'dim')
+          totalPlayers += players.length
+          matches.push({ sofaId: ev.id, home, away, startTimestamp, players })
+
+          if (cdmEvents.indexOf(ev) < cdmEvents.length - 1) await delay(300)
+        }
+
+        if (matches.length === 0) {
+          log('Aucune donnée lineup disponible.', 'err')
+          btn.disabled = false
+          return
+        }
+
+        sep()
+        log(`📤 Envoi vers l'API locale… (${matches.length} match(s), ${totalPlayers} joueurs)`)
+
+        // ── 3. POST vers l'API locale ──────────────────────────────────────
+        let res, result
+        try {
+          res = await fetch(API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date, matches }),
+          })
+          result = await res.json()
+        } catch (e) {
+          log(`❌ Impossible de contacter l'API locale (serveur démarré ?)<br><span class="dim">${e.message}</span>`, 'err')
+          btn.disabled = false
+          return
+        }
+
+        if (!res.ok) {
+          log(`❌ Erreur API ${res.status} : ${result?.error || 'inconnue'}`, 'err')
+          btn.disabled = false
+          return
+        }
+
+        sep()
+        log(`<span class="ok bold">✅ Import terminé — ${result.imported} note(s) enregistrée(s)</span>`)
+        if (result.unmatched?.length > 0) {
+          log(`⚠️ ${result.unmatched.length} joueur(s) non matchés`, 'warn')
+        }
+
+        // ── 4. Résumé ──────────────────────────────────────────────────────
+        document.getElementById('s-matches').textContent   = matches.length
+        document.getElementById('s-players').textContent   = totalPlayers
+        document.getElementById('s-imported').textContent  = result.imported
+        document.getElementById('s-unmatched').textContent = result.unmatched?.length || 0
+
+        if (result.unmatched?.length > 0) {
+          const ul = document.getElementById('unmatched-list')
+          ul.innerHTML = ''
+          result.unmatched.forEach(n => {
+            const li = document.createElement('li')
+            li.textContent = n
+            ul.appendChild(li)
+          })
+          document.getElementById('unmatched-block').style.display = 'block'
+        } else {
+          document.getElementById('unmatched-block').style.display = 'none'
+        }
+
+        sumEl.classList.add('visible')
+
+      } catch (err) {
+        log(`❌ Erreur inattendue : ${err.message}`, 'err')
+        console.error(err)
+      }
+
+      btn.disabled = false
+    }
+  </script>
+</body>
+</html>
