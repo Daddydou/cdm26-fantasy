@@ -87,3 +87,37 @@ export function validateSquad(players: { position: string }[]): {
 
   return { valid: errors.length === 0, errors }
 }
+
+/**
+ * Formule de prix avec stats individuelles 2025-2026
+ *
+ * stat_score = (buts + passes) / matchs × note_moy / 10
+ * prix = valeur_TM × (1 + team_score × 10) × (1 + stat_score × 0.5)
+ *
+ * Exemple :
+ *   Mbappé 180M€, France cote 3.5, 25G+10A en 35 matchs, note 7.8
+ *   → team_score = 0.286
+ *   → stat_score = (35/35) × 7.8/10 = 0.78
+ *   → prix = 180 × 3.86 × 1.39 ≈ 96.5 (vs 69.5 sans stats)
+ */
+export function computePriceWithStats(
+  transfermarktValueM: number,
+  oddsWinner: number,
+  goals: number,
+  assists: number,
+  matches: number,
+  rating: number
+): number {
+  if (oddsWinner <= 0) return Math.round(transfermarktValueM * 10) / 10
+
+  const teamScore = 1 / oddsWinner
+  const basePrice = transfermarktValueM * (1 + teamScore * 10)
+
+  // Stat score : contribution par match × qualité de rating
+  const contributions = matches > 0 ? (goals + assists) / matches : 0
+  const ratingFactor  = rating > 0 ? rating / 10 : 0.65 // 6.5 par défaut si pas de note
+  const statScore     = contributions * ratingFactor
+
+  const finalPrice = basePrice * (1 + statScore * 0.5)
+  return Math.round(finalPrice * 10) / 10
+}

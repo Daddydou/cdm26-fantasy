@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { League, Participant } from '@/lib/database.types'
 import { PHASE_LABELS } from '@/lib/pricing'
@@ -185,6 +186,20 @@ export default function AdminPage() {
             </div>
           ))}
         </div>
+      </Section>
+
+      {/* Import SofaScore */}
+      <Section title="Import des notes">
+        <Link
+          href={`/league/${code}/admin/import-sofascore`}
+          className="flex items-center justify-between p-3 bg-white/5 rounded-lg hover:bg-white/10 transition-all"
+        >
+          <div>
+            <p className="text-sm text-white font-medium">Import notes SofaScore</p>
+            <p className="text-xs text-white/30 mt-0.5">Importer les notes joueurs après chaque match CDM</p>
+          </div>
+          <span className="text-white/40 text-lg">→</span>
+        </Link>
       </Section>
 
       {/* Scripts */}
