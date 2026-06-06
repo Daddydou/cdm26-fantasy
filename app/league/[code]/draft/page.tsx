@@ -18,8 +18,10 @@ export default function DraftPage() {
   const [myPlayerIds, setMyPlayerIds] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState('')
   const [posFilter, setPosFilter] = useState<string>('ALL')
+  const [mySquadMap, setMySquadMap] = useState<Map<string, { squad_id: string; bought_at_price: number }>>(new Map())
   const [loading, setLoading] = useState(true)
   const [buying, setBuying] = useState<string | null>(null)
+  const [selling, setSelling] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
 
@@ -58,11 +60,12 @@ export default function DraftPage() {
 
       const { data: mySquad } = await supabase
         .from('fantasy_squads')
-        .select('player_id')
+        .select('id, player_id, bought_at_price')
         .eq('participant_id', participant.id)
         .eq('active', true)
 
       setMyPlayerIds(new Set((mySquad || []).map(s => s.player_id)))
+      setMySquadMap(new Map((mySquad || []).map(s => [s.player_id, { squad_id: s.id, bought_at_price: s.bought_at_price }])))
 
       const enriched: PlayerWithPrice[] = (playersData || []).map((p: Player & { fantasy_prices?: { price: number; phase: string }[] }) => {
         const priceRow = p.fantasy_prices?.find((pr) => pr.phase === pricePhase)
@@ -105,9 +108,46 @@ export default function DraftPage() {
 
     setMe(prev => prev ? { ...prev, budget_remaining: data.budget_remaining } : prev)
     setMyPlayerIds(prev => new Set([...prev, player.id]))
+    setMySquadMap(prev => new Map([...prev, [player.id, { squad_id: data.squad_id, bought_at_price: player.current_price! }]]))
     setSuccessMsg(`${player.name} acheté pour ${player.current_price} crédits !`)
     setTimeout(() => setSuccessMsg(''), 3000)
     setBuying(null)
+  }
+
+  async function sellPlayer(player: PlayerWithPrice) {
+    if (!me || !league || !league.draft_open) return
+    let entry = mySquadMap.get(player.id)
+    if (!entry) return
+    setSelling(player.id)
+    setError('')
+
+    // Si squad_id manquant (achat dans la même session sans retour RPC), on le cherche
+    if (!entry.squad_id) {
+      const { data: sq } = await supabase
+        .from('fantasy_squads').select('id').eq('participant_id', me.id).eq('player_id', player.id).eq('active', true).single()
+      if (!sq) { setSelling(null); return }
+      entry = { ...entry, squad_id: sq.id }
+    }
+
+    const pricePhase = currentPricePhase(league.phase)
+
+    const { data, error: rpcError } = await supabase.rpc('fantasy_sell_player', {
+      p_participant_id: me.id,
+      p_squad_id:       entry.squad_id,
+      p_sell_price:     entry.bought_at_price,
+      p_phase:          pricePhase,
+    })
+
+    if (rpcError || data?.error) {
+      setError(data?.error || rpcError?.message || 'Erreur inconnue')
+      setSelling(null)
+      return
+    }
+
+    setMe(prev => prev ? { ...prev, budget_remaining: data.budget_remaining } : prev)
+    setMyPlayerIds(prev => { const s = new Set(prev); s.delete(player.id); return s })
+    setMySquadMap(prev => { const m = new Map(prev); m.delete(player.id); return m })
+    setSelling(null)
   }
 
   if (loading) return <Loading />
@@ -167,7 +207,15 @@ export default function DraftPage() {
                   <p className="text-xs text-white/30">crédits</p>
                 </div>
                 {owned ? (
-                  <span className="text-brand-400 text-xs font-medium">✓</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-brand-400 text-xs font-medium">✓</span>
+                    {league?.draft_open && (
+                      <button onClick={() => sellPlayer(player)} disabled={selling === player.id}
+                        className="text-xs text-red-400/70 hover:text-red-400 border border-red-400/20 hover:border-red-400/50 rounded px-1.5 py-0.5 transition-all disabled:opacity-40">
+                        {selling === player.id ? 'Retrait…' : 'Retirer'}
+                      </button>
+                    )}
+                  </div>
                 ) : (
                   <button onClick={() => buyPlayer(player)} disabled={!canAfford || buying === player.id || !player.current_price}
                     className={`btn text-xs py-1.5 px-3 ${canAfford && player.current_price ? 'btn-primary' : 'btn-ghost opacity-40'}`}>
