@@ -83,6 +83,7 @@ export default function StandingsPage() {
   )
 
   const myRank = sorted.findIndex(s => s.participant_id === me?.id) + 1
+  const marketIsOpen = !!(league?.draft_open || league?.market_open)
 
   return (
     <main className="min-h-screen p-4 max-w-lg mx-auto">
@@ -128,8 +129,8 @@ export default function StandingsPage() {
           return (
             <div key={s.participant_id}>
               <div
-                className={`flex items-center gap-3 px-4 py-3.5 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-all ${isMe ? 'bg-brand-500/5' : ''} ${isViewing ? 'bg-white/5' : ''}`}
-                onClick={() => viewSquad(s.participant_id, s.display_name)}
+                className={`flex items-center gap-3 px-4 py-3.5 border-b border-white/5 transition-all ${isMe ? 'bg-brand-500/5' : ''} ${!marketIsOpen && isViewing ? 'bg-white/5' : ''} ${marketIsOpen ? 'cursor-default' : 'cursor-pointer hover:bg-white/5'}`}
+                onClick={marketIsOpen ? undefined : () => viewSquad(s.participant_id, s.display_name)}
               >
                 <span className="text-sm font-bold text-white/30 w-6 text-center">
                   {medal || `${i + 1}`}
@@ -145,7 +146,7 @@ export default function StandingsPage() {
                   }
                 </span>
                 <span className="text-xs text-white/30">{tab === 'pts' ? 'pts' : 'vfm'}</span>
-                <span className="text-white/30 text-xs">{isViewing ? '▲' : '▼'}</span>
+                <span className="text-white/30 text-xs">{marketIsOpen ? '🔒' : isViewing ? '▲' : '▼'}</span>
               </div>
 
               {/* Squad expandable */}
@@ -192,6 +193,12 @@ export default function StandingsPage() {
           )
         })}
       </div>
+
+      {marketIsOpen && (
+        <p className="text-xs text-white/30 text-center mb-3">
+          🔒 Les équipes sont masquées pendant le draft / les transferts
+        </p>
+      )}
 
       {tab === 'vfm' && (
         <p className="text-xs text-white/30 text-center">
