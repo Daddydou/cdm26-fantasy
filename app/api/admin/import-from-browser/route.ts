@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+const ALLOWED_ORIGINS = new Set([
+  'https://www.sofascore.com',
+  'http://localhost:3000',
+  'http://localhost:3001',
+])
+
+function cors(origin: string | null) {
+  const allow = origin && ALLOWED_ORIGINS.has(origin) ? origin : '*'
+  return {
+    'Access-Control-Allow-Origin': allow,
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  }
 }
 
 const supabaseAdmin = createClient(
@@ -95,21 +104,25 @@ type RequestBody = {
   matches: MatchInput[]
 }
 
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS })
+export async function OPTIONS(req: NextRequest) {
+  const origin = req.headers.get('origin')
+  return new NextResponse(null, { status: 204, headers: cors(origin) })
 }
 
 export async function POST(req: NextRequest) {
+  const origin = req.headers.get('origin')
+  const c = cors(origin)
+
   let body: RequestBody
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'JSON invalide' }, { status: 400, headers: CORS })
+    return NextResponse.json({ error: 'JSON invalide' }, { status: 400, headers: c })
   }
 
   const { date, matches } = body
   if (!date || !Array.isArray(matches) || matches.length === 0) {
-    return NextResponse.json({ error: 'Données manquantes' }, { status: 400, headers: CORS })
+    return NextResponse.json({ error: 'Données manquantes' }, { status: 400, headers: c })
   }
 
   const { data: dbPlayers, error: playersError } = await supabaseAdmin
@@ -117,7 +130,7 @@ export async function POST(req: NextRequest) {
     .select('id, name, team')
 
   if (playersError || !dbPlayers) {
-    return NextResponse.json({ error: 'Impossible de charger les joueurs' }, { status: 500, headers: CORS })
+    return NextResponse.json({ error: 'Impossible de charger les joueurs' }, { status: 500, headers: c })
   }
 
   const findPlayer = buildMatcher(dbPlayers as DbPlayer[])
@@ -201,5 +214,5 @@ export async function POST(req: NextRequest) {
       .eq('id', match.id)
   }
 
-  return NextResponse.json({ imported, unmatched }, { headers: CORS })
+  return NextResponse.json({ imported, unmatched }, { headers: c })
 }

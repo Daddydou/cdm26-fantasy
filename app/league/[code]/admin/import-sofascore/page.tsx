@@ -1,211 +1,150 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
-const CDM_ID = 16
-const SOFA   = 'https://api.sofascore.com/api/v1'
+const SCRIPT = `(async () => {
+  const API    = 'https://cdm26-fantasy.vercel.app/api/admin/import-from-browser';
+  // Dev local : const API = 'http://localhost:3000/api/admin/import-from-browser';
+  const CDM_ID = 16;
 
-const TEAM_MAP: Record<string, string> = {
-  France: 'France', England: 'Angleterre', Spain: 'Espagne', Germany: 'Allemagne',
-  Brazil: 'Brésil', Argentina: 'Argentine', Portugal: 'Portugal',
-  Netherlands: 'Pays-Bas', Belgium: 'Belgique', Croatia: 'Croatie',
-  Uruguay: 'Uruguay', Switzerland: 'Suisse', Norway: 'Norvège',
-  'South Korea': 'Corée du Sud', Poland: 'Pologne', Austria: 'Autriche',
-  Turkey: 'Turquie', Scotland: 'Ecosse', 'Czech Republic': 'Rép. Tchèque',
-  Serbia: 'Serbie', Ghana: 'Ghana', Iran: 'Iran', Qatar: 'Qatar',
-  Ecuador: 'Equateur', Colombia: 'Colombie', Canada: 'Canada',
-  Mexico: 'Mexique', USA: 'Etats-Unis', Senegal: 'Sénégal',
-  Morocco: 'Maroc', 'Ivory Coast': "Côte d'Ivoire", Algeria: 'Algérie',
-  Egypt: 'Egypte', Japan: 'Japon', Australia: 'Australie',
-  'South Africa': 'Afrique du Sud', Georgia: 'Géorgie', Bosnia: 'Bosnie',
-  'DR Congo': 'RD Congo', Tunisia: 'Tunisie', Uzbekistan: 'Ouzbékistan',
-  Jordan: 'Jordanie', 'New Zealand': 'Nouvelle-Zélande', Iraq: 'Irak',
-  Haiti: 'Haïti', Curacao: 'Curaçao', 'Cape Verde': 'Cap-Vert',
-  Paraguay: 'Paraguay', 'Saudi Arabia': 'Arabie Saoudite',
-}
+  const today = new Date().toISOString().slice(0, 10);
+  const date  = prompt('Date des matchs (YYYY-MM-DD) :', today);
+  if (!date) return;
+  console.log('[CDM] Matchs du ' + date + '...');
 
-type LogEntry = { msg: string; type: 'info' | 'ok' | 'warn' | 'err' | 'dim' | 'sep' }
+  const evRes = await fetch(
+    'https://api.sofascore.com/api/v1/sport/football/scheduled-events/' + date
+  );
+  if (!evRes.ok) { alert('Erreur events HTTP ' + evRes.status); return; }
+  const evData = await evRes.json();
 
-type MatchPayload = {
-  sofaId: number
-  home: string
-  away: string
-  startTimestamp: number | null
-  players: Array<{
-    name: string
-    team: string
-    rating: number
-    goals: number
-    assists: number
-    minutes: number
-  }>
+  const cdmEvents = (evData.events || []).filter(
+    function(e) {
+      return e.tournament && e.tournament.uniqueTournament &&
+             e.tournament.uniqueTournament.id === CDM_ID;
+    }
+  );
+  if (!cdmEvents.length) { alert('Aucun match CDM le ' + date); return; }
+  console.log('[CDM] ' + cdmEvents.length + ' match(s)');
+
+  const matches = []; let total = 0;
+  for (let i = 0; i < cdmEvents.length; i++) {
+    const ev   = cdmEvents[i];
+    const home = (ev.homeTeam && ev.homeTeam.name) || '?';
+    const away = (ev.awayTeam && ev.awayTeam.name) || '?';
+    console.log('  ' + home + ' vs ' + away);
+
+    const linRes = await fetch(
+      'https://api.sofascore.com/api/v1/event/' + ev.id + '/lineups'
+    );
+    if (!linRes.ok) { console.warn('  Lineups HTTP ' + linRes.status); continue; }
+    const lin = await linRes.json();
+
+    const players = [];
+    for (let s = 0; s < 2; s++) {
+      const side     = s === 0 ? 'home' : 'away';
+      const teamName = s === 0 ? home   : away;
+      const list = (lin[side + 'Team'] && lin[side + 'Team'].players)
+                || (lin[side]          && lin[side].players) || [];
+      for (let j = 0; j < list.length; j++) {
+        const p = list[j];
+        const r = p.statistics && p.statistics.rating;
+        if (!r) continue;
+        players.push({
+          name:    (p.player && p.player.name) || '?', team: teamName,
+          rating:  parseFloat(r),
+          goals:   (p.statistics && p.statistics.goals)         || 0,
+          assists: (p.statistics && p.statistics.goalAssist)    || 0,
+          minutes: (p.statistics && p.statistics.minutesPlayed) || 0,
+        });
+      }
+    }
+    console.log('  -> ' + players.length + ' notes');
+    total += players.length;
+    matches.push({ sofaId: ev.id, home: home, away: away,
+                   startTimestamp: ev.startTimestamp || null, players: players });
+    if (i < cdmEvents.length - 1)
+      await new Promise(function(r) { setTimeout(r, 300); });
+  }
+
+  if (!matches.length) { alert('Aucune lineup disponible.'); return; }
+  console.log('[CDM] Envoi ' + matches.length + ' matchs, ' + total + ' joueurs...');
+
+  const res = await fetch(API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ date: date, matches: matches }),
+  });
+  const result = await res.json();
+  if (!res.ok) { alert('Erreur API ' + res.status + ' : ' + (result && result.error)); return; }
+
+  const nm = (result.unmatched && result.unmatched.length)
+    ? '\\n\\n Non matches (' + result.unmatched.length + ') :\\n' + result.unmatched.join('\\n')
+    : '';
+  alert('Import OK ! ' + result.imported + ' notes importees' + nm);
+  console.log('[CDM] Done :', result);
+})();`
+
+type RecentMatch = {
+  id: string
+  home_team: string
+  away_team: string
+  match_date: string
+  scoreCount: number
 }
 
 export default function ImportSofascorePage() {
   const { code } = useParams<{ code: string }>()
   const router = useRouter()
   const [checking, setChecking] = useState(true)
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
-  const [running, setRunning] = useState(false)
-  const [log, setLog] = useState<LogEntry[]>([])
-  const [result, setResult] = useState<{ imported: number; unmatched: string[] } | null>(null)
-  const logEndRef = useRef<HTMLDivElement>(null)
+  const [copied, setCopied] = useState(false)
+  const [recentMatches, setRecentMatches] = useState<RecentMatch[]>([])
+  const [loadingRecent, setLoadingRecent] = useState(true)
 
   useEffect(() => {
-    async function checkAdmin() {
+    async function init() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/'); return }
       const { data: lg } = await supabase.from('fantasy_leagues').select().eq('code', code).single()
       if (!lg || lg.admin_user_id !== user.id) { router.push(`/league/${code}`); return }
       setChecking(false)
+
+      // Charger les derniers imports
+      const { data: matches } = await supabase
+        .from('fantasy_matches')
+        .select('id, home_team, away_team, match_date')
+        .eq('processed', true)
+        .order('match_date', { ascending: false })
+        .limit(12)
+
+      if (matches && matches.length > 0) {
+        const ids = matches.map(m => m.id)
+        const { data: scores } = await supabase
+          .from('fantasy_scores')
+          .select('match_id')
+          .in('match_id', ids)
+
+        const countMap: Record<string, number> = {}
+        for (const s of (scores || [])) {
+          countMap[s.match_id] = (countMap[s.match_id] || 0) + 1
+        }
+
+        setRecentMatches(matches.map(m => ({ ...m, scoreCount: countMap[m.id] || 0 })))
+      }
+      setLoadingRecent(false)
     }
-    checkAdmin()
+    init()
   }, [code, router])
 
-  useEffect(() => {
-    logEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [log])
-
-  function add(msg: string, type: LogEntry['type'] = 'info') {
-    setLog(prev => [...prev, { msg, type }])
-  }
-  function sep() { setLog(prev => [...prev, { msg: '', type: 'sep' }]) }
-
-  async function run() {
-    setLog([])
-    setResult(null)
-    setRunning(true)
-
-    try {
-      // ── 1. Matchs du jour ────────────────────────────────────────────────
-      add(`Récupération des matchs CDM du ${date}…`)
-
-      const evRes = await fetch(`${SOFA}/sport/football/scheduled-events/${date}`)
-      if (!evRes.ok) throw new Error(`SofaScore events : HTTP ${evRes.status}`)
-      const evData = await evRes.json()
-
-      type SofaEvent = {
-        id: number
-        homeTeam: { name: string }
-        awayTeam: { name: string }
-        startTimestamp?: number
-        status: { description: string }
-        tournament: { uniqueTournament: { id: number } }
-      }
-
-      const cdmEvents: SofaEvent[] = (evData.events || []).filter(
-        (e: SofaEvent) => e.tournament?.uniqueTournament?.id === CDM_ID
-      )
-
-      if (cdmEvents.length === 0) {
-        add('Aucun match CDM trouvé pour cette date.', 'warn')
-        setRunning(false)
-        return
-      }
-
-      add(`${cdmEvents.length} match(s) CDM trouvé(s)`, 'ok')
-      sep()
-
-      // ── 2. Lineups par match ─────────────────────────────────────────────
-      const matches: MatchPayload[] = []
-      let totalPlayers = 0
-
-      for (let i = 0; i < cdmEvents.length; i++) {
-        const ev = cdmEvents[i]
-        const home = ev.homeTeam.name
-        const away = ev.awayTeam.name
-
-        add(`⚽ ${TEAM_MAP[home] || home} vs ${TEAM_MAP[away] || away} (id ${ev.id}) · ${ev.status.description}`)
-
-        let linData: Record<string, unknown>
-        try {
-          const linRes = await fetch(`${SOFA}/event/${ev.id}/lineups`)
-          if (!linRes.ok) throw new Error(`HTTP ${linRes.status}`)
-          linData = await linRes.json()
-        } catch (e) {
-          add(`  ⚠ Lineups indisponibles : ${(e as Error).message}`, 'warn')
-          continue
-        }
-
-        type SofaPlayer = {
-          player: { name: string }
-          statistics?: {
-            rating?: number | string
-            goals?: number
-            goalAssist?: number
-            minutesPlayed?: number
-          }
-        }
-
-        const players: MatchPayload['players'] = []
-
-        for (const side of ['homeTeam', 'awayTeam'] as const) {
-          const sideData = linData[side] as { players?: SofaPlayer[] } | undefined
-          const sidePlayers = sideData?.players || []
-          const teamName = ev[side].name
-
-          for (const p of sidePlayers) {
-            const rawRating = p.statistics?.rating
-            if (rawRating == null) continue
-            const rating = typeof rawRating === 'string' ? parseFloat(rawRating) : rawRating
-            if (!rating) continue
-            players.push({
-              name: p.player.name,
-              team: teamName,
-              rating,
-              goals: p.statistics?.goals || 0,
-              assists: p.statistics?.goalAssist || 0,
-              minutes: p.statistics?.minutesPlayed || 0,
-            })
-          }
-        }
-
-        add(`  → ${players.length} joueurs avec note`, 'dim')
-        totalPlayers += players.length
-        matches.push({ sofaId: ev.id, home, away, startTimestamp: ev.startTimestamp || null, players })
-
-        if (i < cdmEvents.length - 1) await new Promise(r => setTimeout(r, 300))
-      }
-
-      if (matches.length === 0) {
-        add('Aucune donnée lineup disponible pour cette date.', 'err')
-        setRunning(false)
-        return
-      }
-
-      sep()
-      add(`Envoi vers l'API… (${matches.length} match(s), ${totalPlayers} joueurs)`)
-
-      // ── 3. POST import-from-browser ──────────────────────────────────────
-      const res = await fetch('/api/admin/import-from-browser', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date, matches }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error || `API ${res.status}`)
-
-      sep()
-      add(`✓ Import terminé — ${data.imported} note(s) enregistrée(s)`, 'ok')
-      if (data.unmatched?.length > 0) add(`${data.unmatched.length} joueur(s) non matchés`, 'warn')
-
-      setResult({ imported: data.imported, unmatched: data.unmatched || [] })
-
-    } catch (e) {
-      add(`Erreur : ${(e as Error).message}`, 'err')
-    }
-
-    setRunning(false)
+  async function copyScript() {
+    await navigator.clipboard.writeText(SCRIPT)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   if (checking) return <Loading />
-
-  const colors: Record<LogEntry['type'], string> = {
-    info: 'text-white/70', ok: 'text-green-400', warn: 'text-yellow-400',
-    err: 'text-red-400', dim: 'text-white/30', sep: '',
-  }
 
   return (
     <main className="min-h-screen p-4 max-w-lg mx-auto">
@@ -217,61 +156,83 @@ export default function ImportSofascorePage() {
         </div>
       </div>
 
+      {/* Instructions */}
       <div className="card p-4 mb-4">
-        <div className="flex gap-2 items-end">
-          <div className="flex-1">
-            <label className="text-xs text-white/40 block mb-1.5">Date des matchs</label>
-            <input
-              type="date"
-              className="input w-full"
-              value={date}
-              onChange={e => setDate(e.target.value)}
-              disabled={running}
-            />
+        <h2 className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-4">Comment importer les notes</h2>
+        <div className="space-y-4">
+          <Step n={1} text="Ouvre sofascore.com dans Chrome" />
+          <Step n={2} text="Appuie sur F12 → onglet Console" />
+
+          <div className="flex items-start gap-3">
+            <span className="w-6 h-6 rounded-full bg-brand-500/20 text-brand-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-white mb-2">Copie le script et colle-le dans la console</p>
+              <div className="relative">
+                <pre className="bg-black/40 border border-white/10 rounded-lg p-3 text-xs text-white/50 font-mono overflow-x-auto max-h-32 overflow-y-auto whitespace-pre-wrap break-all leading-relaxed">
+                  {SCRIPT.slice(0, 120)}…
+                </pre>
+                <button
+                  onClick={copyScript}
+                  className={`mt-2 w-full py-2 rounded-lg text-xs font-medium transition-all border ${
+                    copied
+                      ? 'bg-green-500/10 border-green-500/30 text-green-400'
+                      : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  {copied ? '✓ Copié !' : '📋 Copier le script'}
+                </button>
+              </div>
+            </div>
           </div>
-          <button onClick={run} disabled={running || !date} className="btn-primary disabled:opacity-50">
-            {running ? 'En cours…' : 'Récupérer'}
-          </button>
+
+          <Step n={4} text="Appuie sur Entrée pour lancer le script" />
+          <Step n={5} text='Entre la date quand demandé (ex : 2026-06-11)' />
         </div>
       </div>
 
-      {log.length > 0 && (
-        <div className="card p-4 mb-4 font-mono text-xs max-h-72 overflow-y-auto space-y-0.5">
-          {log.map((e, i) =>
-            e.type === 'sep'
-              ? <hr key={i} className="border-white/10 my-1" />
-              : <div key={i} className={colors[e.type]}>{e.msg}</div>
-          )}
-          <div ref={logEndRef} />
+      {/* Derniers imports */}
+      <div className="card">
+        <div className="p-4 border-b border-white/5 flex items-center justify-between">
+          <h2 className="text-xs font-semibold text-white/40 uppercase tracking-wider">Derniers imports</h2>
+          <button
+            onClick={() => window.location.reload()}
+            className="text-xs text-white/30 hover:text-white/60 transition-colors"
+          >
+            ↻ Rafraîchir
+          </button>
         </div>
-      )}
-
-      {result && (
-        <div className="card p-4">
-          <h2 className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-4">Résultat</h2>
-          <div className="flex gap-6 mb-3">
-            <div className="text-center flex-1">
-              <p className="text-2xl font-bold text-white">{result.imported}</p>
-              <p className="text-xs text-white/40 mt-0.5">importées</p>
-            </div>
-            <div className="text-center flex-1">
-              <p className={`text-2xl font-bold ${result.unmatched.length > 0 ? 'text-yellow-400' : 'text-white'}`}>
-                {result.unmatched.length}
-              </p>
-              <p className="text-xs text-white/40 mt-0.5">non matchés</p>
-            </div>
+        {loadingRecent ? (
+          <div className="p-4 text-center text-xs text-white/30">Chargement…</div>
+        ) : recentMatches.length === 0 ? (
+          <div className="p-4 text-center text-xs text-white/30">Aucun import pour l&apos;instant</div>
+        ) : (
+          <div>
+            {recentMatches.map(m => (
+              <div key={m.id} className="flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-white truncate">{m.home_team} vs {m.away_team}</p>
+                  <p className="text-xs text-white/30">
+                    {new Date(m.match_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </p>
+                </div>
+                <span className="text-xs text-brand-400 font-medium flex-shrink-0">
+                  {m.scoreCount} notes
+                </span>
+              </div>
+            ))}
           </div>
-          {result.unmatched.length > 0 && (
-            <div className="border-t border-white/5 pt-3 space-y-0.5">
-              <p className="text-xs text-yellow-400 mb-1">Joueurs non matchés :</p>
-              {result.unmatched.map(n => (
-                <p key={n} className="text-xs text-white/30">· {n}</p>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </main>
+  )
+}
+
+function Step({ n, text }: { n: number; text: string }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="w-6 h-6 rounded-full bg-brand-500/20 text-brand-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{n}</span>
+      <p className="text-sm text-white pt-0.5">{text}</p>
+    </div>
   )
 }
 
