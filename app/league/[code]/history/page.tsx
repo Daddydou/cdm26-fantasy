@@ -47,9 +47,12 @@ export default function HistoryPage() {
   const router = useRouter()
   const [league, setLeague] = useState<League | null>(null)
   const [me, setMe] = useState<Participant | null>(null)
+  const [participants, setParticipants] = useState<Participant[]>([])
   const [transfers, setTransfers] = useState<Transfer[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<'all' | 'mine'>('all')
+  const [participantFilter, setParticipantFilter] = useState<string>('all')
+  const [teamFilter, setTeamFilter] = useState<string>('all')
+  const [sort, setSort] = useState<string>('newest')
 
   useEffect(() => {
     async function load() {
@@ -64,6 +67,10 @@ export default function HistoryPage() {
         .eq('league_id', lg.id).eq('user_id', user.id).single()
       if (!p) { router.push('/'); return }
       setMe(p)
+
+      const { data: allParticipants } = await supabase.from('fantasy_participants').select()
+        .eq('league_id', lg.id).order('display_name')
+      setParticipants(allParticipants || [])
 
       const { data: squads } = await supabase
         .from('fantasy_squads')
@@ -102,13 +109,24 @@ export default function HistoryPage() {
 
   if (loading) return <Loading />
 
-  const filtered = filter === 'mine'
-    ? transfers.filter(t => t.participant_id === me?.id)
-    : transfers
+  const teams = [...new Set(transfers.map(t => t.team))].sort()
+
+  let filtered = [...transfers]
+  if (participantFilter !== 'all') filtered = filtered.filter(t => t.participant_id === participantFilter)
+  if (teamFilter !== 'all') filtered = filtered.filter(t => t.team === teamFilter)
+  if (sort === 'oldest') filtered.sort((a, b) => a.created_at.localeCompare(b.created_at))
+  else if (sort === 'price_desc') filtered.sort((a, b) => b.bought_at_price - a.bought_at_price)
+  else if (sort === 'price_asc') filtered.sort((a, b) => a.bought_at_price - b.bought_at_price)
+  else if (sort === 'pnl_desc') {
+    filtered = filtered.filter(t => t.sold_at_price !== null)
+    filtered.sort((a, b) => (b.sold_at_price! - b.bought_at_price) - (a.sold_at_price! - a.bought_at_price))
+  }
 
   const totalBuys = transfers.length
   const totalSells = transfers.filter(t => !t.active && t.sold_at_price).length
   const totalVolume = transfers.reduce((s, t) => s + t.bought_at_price, 0)
+
+  const selectClass = 'w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white appearance-none focus:outline-none focus:border-brand-500/50'
 
   return (
     <main className="min-h-screen p-4 max-w-lg mx-auto">
@@ -126,10 +144,27 @@ export default function HistoryPage() {
         <div className="card p-3 text-center"><p className="text-xl font-bold text-white">{Math.round(totalVolume)}</p><p className="text-xs text-white/40">volume cr.</p></div>
       </div>
 
-      <div className="flex gap-1 bg-white/5 rounded-lg p-1 mb-4">
-        <button onClick={() => setFilter('all')} className={`flex-1 py-2 rounded-md text-xs font-medium transition-all ${filter === 'all' ? 'bg-brand-500 text-white' : 'text-white/50'}`}>Tous</button>
-        <button onClick={() => setFilter('mine')} className={`flex-1 py-2 rounded-md text-xs font-medium transition-all ${filter === 'mine' ? 'bg-brand-500 text-white' : 'text-white/50'}`}>Mes transferts</button>
+      <div className="space-y-2 mb-2">
+        <select value={participantFilter} onChange={e => setParticipantFilter(e.target.value)} className={selectClass}>
+          <option value="all">Tous les participants</option>
+          {me && <option value={me.id}>Moi ({me.display_name})</option>}
+          {participants.filter(p => p.id !== me?.id).map(p => (
+            <option key={p.id} value={p.id}>{p.display_name}</option>
+          ))}
+        </select>
+        <select value={teamFilter} onChange={e => setTeamFilter(e.target.value)} className={selectClass}>
+          <option value="all">Toutes les équipes</option>
+          {teams.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <select value={sort} onChange={e => setSort(e.target.value)} className={selectClass}>
+          <option value="newest">Plus récent</option>
+          <option value="oldest">Plus ancien</option>
+          <option value="price_desc">Prix d&apos;achat ↓</option>
+          <option value="price_asc">Prix d&apos;achat ↑</option>
+          <option value="pnl_desc">Meilleur P&amp;L</option>
+        </select>
       </div>
+      <p className="text-xs text-white/30 mb-4">{filtered.length} résultat{filtered.length !== 1 ? 's' : ''}</p>
 
       {filtered.length === 0 ? (
         <div className="text-center py-12 text-white/30">Aucun transfert</div>
