@@ -132,7 +132,7 @@ export default function PlayerPage() {
     : null
 
   return (
-    <main className="min-h-screen p-4 max-w-lg mx-auto">
+    <main className="min-h-screen p-4 max-w-lg mx-auto overflow-x-hidden">
       {/* Header */}
       <div className="flex items-center gap-3 mb-5">
         <button onClick={() => router.back()} className="text-white/40 hover:text-white">←</button>

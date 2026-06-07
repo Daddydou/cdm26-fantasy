@@ -86,7 +86,7 @@ export default function StandingsPage() {
   const marketIsOpen = !!(league?.draft_open || league?.market_open)
 
   return (
-    <main className="min-h-screen p-4 max-w-lg mx-auto">
+    <main className="min-h-screen p-4 max-w-lg mx-auto overflow-x-hidden">
       <div className="flex items-center gap-3 mb-5">
         <button onClick={() => router.push(`/league/${code}`)} className="text-white/40 hover:text-white">←</button>
         <div>
@@ -135,7 +135,7 @@ export default function StandingsPage() {
                 <span className="text-sm font-bold text-white/30 w-6 text-center">
                   {medal || `${i + 1}`}
                 </span>
-                <span className={`flex-1 text-sm font-medium truncate ${isMe ? 'text-brand-400' : 'text-white'}`}>
+                <span className={`flex-1 text-sm font-medium truncate max-w-[140px] ${isMe ? 'text-brand-400' : 'text-white'}`}>
                   {s.display_name}
                   {isMe && <span className="text-white/30 ml-1 font-normal">(toi)</span>}
                 </span>

@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
 @layer base {
   :root {
     --color-brand: #22c55e;

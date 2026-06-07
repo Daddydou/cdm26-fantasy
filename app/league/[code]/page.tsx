@@ -60,7 +60,7 @@ export default function LeaguePage() {
   const marketIsOpen = league.market_open || league.draft_open
 
   return (
-    <main className="min-h-screen p-4 max-w-lg mx-auto">
+    <main className="min-h-screen p-4 max-w-lg mx-auto overflow-x-hidden">
       {/* Header */}
       <div className="flex items-center justify-between mb-6 pt-2">
         <div>

@@ -156,7 +156,7 @@ export default function DraftPage() {
   const myCount = myPlayerIds.size
 
   return (
-    <main className="min-h-screen p-4 max-w-lg mx-auto">
+    <main className="min-h-screen p-4 max-w-lg mx-auto overflow-x-hidden">
       <div className="flex items-center gap-3 mb-5">
         <button onClick={() => router.push(`/league/${code}`)} className="text-white/40 hover:text-white">←</button>
         <div>
@@ -176,7 +176,7 @@ export default function DraftPage() {
 
       <div className="space-y-3 mb-4">
         <input className="input" placeholder="Rechercher un joueur ou une équipe…" value={search} onChange={e => setSearch(e.target.value)} />
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4">
           {(['ALL', ...POSITIONS] as const).map(pos => (
             <button key={pos} onClick={() => setPosFilter(pos)}
               className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${posFilter === pos ? 'bg-brand-500 text-white' : 'bg-white/5 text-white/50 hover:text-white'}`}>

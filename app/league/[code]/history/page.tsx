@@ -135,7 +135,7 @@ export default function HistoryPage() {
   const selectClass = 'w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white appearance-none focus:outline-none focus:border-brand-500/50'
 
   return (
-    <main className="min-h-screen p-4 max-w-lg mx-auto">
+    <main className="min-h-screen p-4 max-w-lg mx-auto overflow-x-hidden">
       <div className="flex items-center gap-3 mb-5">
         <button onClick={() => router.push(`/league/${code}`)} className="text-white/40 hover:text-white">←</button>
         <div>

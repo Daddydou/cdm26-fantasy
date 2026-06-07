@@ -84,7 +84,7 @@ export default function SquadPage() {
   const validation = validateSquad(squad.map(s => ({ position: s.position })))
 
   return (
-    <main className="min-h-screen p-4 max-w-lg mx-auto">
+    <main className="min-h-screen p-4 max-w-lg mx-auto overflow-x-hidden">
       <div className="flex items-center gap-3 mb-5">
         <button onClick={() => router.push(`/league/${code}`)} className="text-white/40 hover:text-white">←</button>
         <div>
