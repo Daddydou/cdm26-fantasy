@@ -33,6 +33,7 @@ const supabase = createClient(
 // Cotes manuelles de secours (à mettre à jour avant la CDM)
 // Format : { "France": 3.5, "Angleterre": 6.0, ... }
 const FALLBACK_ODDS: Record<string, number> = {
+  // Favoris
   "France": 3.5,
   "Angleterre": 6.0,
   "Espagne": 5.5,
@@ -44,6 +45,7 @@ const FALLBACK_ODDS: Record<string, number> = {
   "Pays-Bas": 12.0,
   "Belgique": 20.0,
   "Uruguay": 25.0,
+  "Suède": 50.0,
   "Mexique": 40.0,
   "États-Unis": 30.0,
   "Canada": 50.0,
@@ -52,19 +54,35 @@ const FALLBACK_ODDS: Record<string, number> = {
   "Sénégal": 40.0,
   "Colombie": 30.0,
   "Équateur": 60.0,
-  "Danemark": 25.0,
   "Croatie": 30.0,
   "Autriche": 30.0,
   "Suisse": 35.0,
-  "Pologne": 50.0,
-  "Serbie": 50.0,
-  "Hongrie": 100.0,
   "Turquie": 40.0,
-  "Géorgie": 150.0,
   "Australie": 80.0,
   "Corée du Sud": 80.0,
   "Iran": 100.0,
   "Arabie Saoudite": 100.0,
+  // Équipes qualifiées CdM 2026 — noms exacts de la DB
+  "Tunisie": 100.0,
+  "Ghana": 100.0,
+  "Algerie": 100.0,
+  "Egypte": 150.0,
+  "Cote d Ivoire": 80.0,
+  "Afrique du Sud": 200.0,
+  "RD Congo": 200.0,
+  "Cap-Vert": 300.0,
+  "Paraguay": 100.0,
+  "Qatar": 200.0,
+  "Panama": 300.0,
+  "Haiti": 500.0,
+  "Rep. Tcheque": 100.0,
+  "Bosnie": 150.0,
+  "Ecosse": 150.0,
+  "Irak": 300.0,
+  "Jordanie": 500.0,
+  "Ouzbekistan": 500.0,
+  "Curacao": 1000.0,
+  "Nouvelle-Zelande": 500.0,
 }
 
 async function fetchOddsFromApi(): Promise<Record<string, number> | null> {
@@ -125,14 +143,23 @@ async function main() {
   else console.log(`✅  ${teamsToUpsert.length} équipes mises à jour`)
 
   // 3. Récupérer tous les joueurs actifs
-  const { data: players, error: playersError } = await supabase
-    .from('fantasy_players')
-    .select('id, name, team, transfermarkt_value_m')
-    .eq('active', true)
-
-  if (playersError || !players) {
-    console.error('❌  Impossible de récupérer les joueurs :', playersError?.message)
-    process.exit(1)
+  // Pagination par lots de 1000 (limite PostgREST)
+  const players: { id: string; name: string; team: string; transfermarkt_value_m: number }[] = []
+  let page = 0
+  while (true) {
+    const { data, error } = await supabase
+      .from('fantasy_players')
+      .select('id, name, team, transfermarkt_value_m')
+      .eq('active', true)
+      .range(page * 1000, (page + 1) * 1000 - 1)
+    if (error) {
+      console.error('❌  Impossible de récupérer les joueurs :', error.message)
+      process.exit(1)
+    }
+    if (!data || data.length === 0) break
+    players.push(...data)
+    if (data.length < 1000) break
+    page++
   }
 
   console.log(`\n📊  ${players.length} joueurs à pricer`)
