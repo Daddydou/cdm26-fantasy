@@ -4,84 +4,49 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
-const ADMIN_EMAIL = 'lolo.rms@gmail.com'
-const STORAGE_KEY = 'cdm26_league'
-const PENDING_KEY = 'cdm26_pending'
+const LEAGUE_CODE = 'I8FDQU'
+const PASSWORD    = 'CDM2026'
+const SESSION_KEY = 'cdm26_session'
 
 export default function HomePage() {
   const router = useRouter()
-  const [step, setStep] = useState<'home' | 'email' | 'check_email' | 'join_name'>('home')
-  const [email, setEmail] = useState('')
-  const [code, setCode] = useState('')
   const [displayName, setDisplayName] = useState('')
-  const [leagueName, setLeagueName] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [checking, setChecking] = useState(true)
-  const [isCreate, setIsCreate] = useState(false)
-  const [loggedIn, setLoggedIn] = useState(false)
-  const [needsReconnect, setNeedsReconnect] = useState(false)
+  const [password, setPassword]       = useState('')
+  const [loading, setLoading]         = useState(false)
+  const [error, setError]             = useState('')
+  const [checking, setChecking]       = useState(true)
+  const [reconnecting, setReconnecting] = useState(false)
 
   useEffect(() => {
     async function tryAutoLogin() {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
-          // Mode standalone iOS : session perdue — pré-remplir le code si disponible
-          const savedCode = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY)
-          if (savedCode) {
-            setCode(savedCode)
-            setIsCreate(false)
-            setNeedsReconnect(true)
-            setStep('email')
-          }
+        // 1. Session Supabase valide (anon persisté ou admin magic link)
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          const { data: p } = await supabase
+            .from('fantasy_participants')
+            .select('fantasy_leagues(code)')
+            .eq('user_id', session.user.id)
+            .limit(1)
+            .single()
+          const code = (p?.fantasy_leagues as any)?.code
+          if (code) { router.push(`/league/${code}`); return }
+          // Session sans ligue (cas rare) → afficher le formulaire
           setChecking(false)
           return
         }
 
-        // Session valide — trouver sa ligue
-        const savedCode = localStorage.getItem(STORAGE_KEY)
-        if (savedCode) {
-          const { data: lg } = await supabase
-            .from('fantasy_leagues').select('id').eq('code', savedCode).single()
-          if (lg) {
-            const { data: p } = await supabase
-              .from('fantasy_participants').select('id')
-              .eq('league_id', lg.id).eq('user_id', user.id).single()
-            if (p) { router.push(`/league/${savedCode}`); return }
-          }
-        }
-
-        // Session valide mais pas de ligue → chercher sa ligue
-        const { data: p } = await supabase
-          .from('fantasy_participants').select('league_id, fantasy_leagues(code)')
-          .eq('user_id', user.id).limit(1).single()
-
-        if (p) {
-          const leagueCode = (p.fantasy_leagues as any)?.code
-          if (leagueCode) {
-            localStorage.setItem(STORAGE_KEY, leagueCode)
-            router.push(`/league/${leagueCode}`)
-            return
-          }
-        }
-
-        // Connecté mais pas encore dans une ligue — restaurer l'intention si retour magic link
-        const pending = sessionStorage.getItem(PENDING_KEY)
-        if (pending) {
+        // 2. Pas de session — pré-remplir le pseudo si localStorage connu
+        const raw = localStorage.getItem(SESSION_KEY)
+        if (raw) {
           try {
-            const { isCreate: ic, code: c } = JSON.parse(pending)
-            sessionStorage.removeItem(PENDING_KEY)
-            setIsCreate(ic)
-            if (c) setCode(c)
-            setLoggedIn(true)
-            setStep('join_name')
-            setChecking(false)
-            return
+            const stored = JSON.parse(raw)
+            if (stored.authenticated && stored.displayName) {
+              setDisplayName(stored.displayName)
+              setReconnecting(true)
+            }
           } catch {}
         }
-
-        setLoggedIn(true)
         setChecking(false)
       } catch {
         setChecking(false)
@@ -90,97 +55,32 @@ export default function HomePage() {
     tryAutoLogin()
   }, [router])
 
-  async function sendMagicLink() {
-    if (!email.trim()) return
+  async function handleSubmit() {
+    const name = displayName.trim()
+    if (!name || !password) return
+    if (password !== PASSWORD) { setError('Mot de passe incorrect'); return }
     setLoading(true)
     setError('')
     try {
-      sessionStorage.setItem(PENDING_KEY, JSON.stringify({ isCreate, code }))
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim().toLowerCase(),
-        options: {
-          shouldCreateUser: true,
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        }
+      const { data: anon, error: anonErr } = await supabase.auth.signInAnonymously()
+      if (anonErr || !anon.user) throw new Error('Connexion anonyme échouée')
+
+      const { data, error: rpcErr } = await supabase.rpc('fantasy_join_league', {
+        p_display_name: name,
+        p_league_code:  LEAGUE_CODE,
       })
-      if (error) throw error
-      setStep('check_email')
-    } catch (e) {
-      sessionStorage.removeItem(PENDING_KEY)
-      setError((e as Error).message)
-    } finally {
-      setLoading(false)
-    }
-  }
+      if (rpcErr) throw rpcErr
+      if (data?.error) throw new Error(data.error)
 
-  async function handleJoin() {
-    if (!displayName.trim()) return
-    setLoading(true)
-    setError('')
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Non connecté')
-
-      const { data: league, error: lgErr } = await supabase
-        .from('fantasy_leagues').select().eq('code', code.toUpperCase().trim()).single()
-      if (lgErr || !league) throw new Error('Code de ligue invalide')
-
-      const { error: joinError } = await supabase
-        .from('fantasy_participants').insert({
-          league_id: league.id,
-          user_id: user.id,
-          display_name: displayName.trim(),
-          budget_remaining: league.budget_per_user,
-        })
-      if (joinError) {
-        if (joinError.code === '23505') throw new Error('Tu es déjà dans cette ligue')
-        throw joinError
-      }
-
-      localStorage.setItem(STORAGE_KEY, league.code)
-      sessionStorage.setItem(STORAGE_KEY, league.code)
-      router.push(`/league/${league.code}`)
+      localStorage.setItem(SESSION_KEY, JSON.stringify({
+        authenticated: true,
+        userId:        anon.user.id,
+        displayName:   name,
+        leagueCode:    LEAGUE_CODE,
+      }))
+      router.push(`/league/${LEAGUE_CODE}`)
     } catch (e) {
       setError((e as Error).message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handleCreate() {
-    if (!leagueName.trim() || !displayName.trim()) return
-    setLoading(true)
-    setError('')
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Non connecté')
-
-      const leagueCode = Math.random().toString(36).substring(2, 8).toUpperCase()
-      const { data: league, error: createError } = await supabase
-        .from('fantasy_leagues').insert({
-          name: leagueName.trim(),
-          code: leagueCode,
-          admin_user_id: user.id,
-          phase: 'draft',
-          budget_per_user: 2150,
-          draft_open: false,
-          market_open: false,
-        }).select().single()
-      if (createError || !league) throw createError || new Error('Création échouée')
-
-      await supabase.from('fantasy_participants').insert({
-        league_id: league.id,
-        user_id: user.id,
-        display_name: displayName.trim(),
-        budget_remaining: league.budget_per_user,
-      })
-
-      localStorage.setItem(STORAGE_KEY, leagueCode)
-      sessionStorage.setItem(STORAGE_KEY, leagueCode)
-      router.push(`/league/${leagueCode}`)
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
       setLoading(false)
     }
   }
@@ -199,106 +99,49 @@ export default function HomePage() {
         <p className="text-white/50 text-sm">Coupe du Monde 2026 · Draft · Transferts · Classement</p>
       </div>
 
-      <div className="card w-full max-w-md p-6">
-
-        {/* Étape 1 : home */}
-        {step === 'home' && (
-          <div className="space-y-3">
-            <button onClick={() => { setIsCreate(false); setStep(loggedIn ? 'join_name' : 'email') }}
-              className="btn-primary w-full py-3 text-base">
-              Rejoindre une ligue →
-            </button>
-            <button onClick={() => { setIsCreate(true); setStep(loggedIn ? 'join_name' : 'email') }}
-              className="btn-ghost w-full py-3 text-base">
-              Créer une ligue
-            </button>
+      <div className="card w-full max-w-md p-6 space-y-4">
+        {reconnecting && (
+          <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-yellow-300 text-xs">
+            Reconnexion nécessaire — entre ton mot de passe pour continuer
           </div>
         )}
-
-        {/* Étape 2 : email */}
-        {step === 'email' && (
-          <div className="space-y-4">
-            {needsReconnect ? (
-              <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-yellow-300 text-xs">
-                Reconnexion nécessaire — entre ton email pour recevoir un nouveau lien
-              </div>
-            ) : (
-              <button onClick={() => setStep('home')} className="text-white/40 text-sm hover:text-white">← Retour</button>
-            )}
-            <div>
-              <label className="text-xs text-white/50 mb-1.5 block">Ton adresse email</label>
-              <input className="input" type="email" placeholder="toi@email.com"
-                value={email} onChange={e => setEmail(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && sendMagicLink()} />
-            </div>
-            {!isCreate && (
-              <div>
-                <label className="text-xs text-white/50 mb-1.5 block">Code de ligue</label>
-                <input className="input uppercase tracking-widest text-center text-lg font-bold"
-                  placeholder="ABC123" value={code} onChange={e => setCode(e.target.value)} maxLength={6} />
-              </div>
-            )}
-            <button onClick={sendMagicLink} disabled={loading || !email}
-              className="btn-primary w-full py-3 text-base">
-              {loading ? 'Envoi…' : 'Recevoir le lien de connexion →'}
-            </button>
-            <p className="text-xs text-white/30 text-center">Un lien magique sera envoyé à ton email — pas de mot de passe !</p>
-          </div>
-        )}
-
-        {/* Étape 3 : vérifier email */}
-        {step === 'check_email' && (
-          <div className="text-center space-y-4">
-            <div className="text-5xl">📬</div>
-            <h2 className="text-lg font-semibold text-white">Vérifie tes emails !</h2>
-            <p className="text-sm text-white/50">
-              On a envoyé un lien de connexion à<br />
-              <span className="text-white font-medium">{email}</span>
-            </p>
-            <p className="text-xs text-white/30">Clique sur le lien dans l'email pour accéder à l'app.</p>
-            <button onClick={() => setStep('email')} className="btn-ghost text-sm w-full">
-              ← Changer d'email
-            </button>
-          </div>
-        )}
-
-        {/* Étape 4 : pseudo (après callback) */}
-        {step === 'join_name' && (
-          <div className="space-y-4">
-            {!isCreate ? (
-              <>
-                <h2 className="text-sm font-semibold text-white mb-2">Presque ! Rejoins ta ligue</h2>
-                <input className="input uppercase tracking-widest text-center text-lg font-bold"
-                  placeholder="Code de ligue" value={code} onChange={e => setCode(e.target.value)} maxLength={6} />
-                <input className="input" placeholder="Ton pseudo dans la ligue"
-                  value={displayName} onChange={e => setDisplayName(e.target.value)} />
-                <button onClick={handleJoin} disabled={loading || !displayName || !code}
-                  className="btn-primary w-full py-3">
-                  {loading ? 'Connexion…' : 'Rejoindre →'}
-                </button>
-              </>
-            ) : (
-              <>
-                <h2 className="text-sm font-semibold text-white mb-2">Crée ta ligue</h2>
-                <input className="input" placeholder="Nom de la ligue"
-                  value={leagueName} onChange={e => setLeagueName(e.target.value)} />
-                <input className="input" placeholder="Ton pseudo (admin)"
-                  value={displayName} onChange={e => setDisplayName(e.target.value)} />
-                <button onClick={handleCreate} disabled={loading || !leagueName || !displayName}
-                  className="btn-primary w-full py-3">
-                  {loading ? 'Création…' : 'Créer la ligue →'}
-                </button>
-              </>
-            )}
-          </div>
-        )}
-
+        <div>
+          <label className="text-xs text-white/50 mb-1.5 block">Ton pseudo</label>
+          <input
+            className="input"
+            placeholder="MonPseudo"
+            value={displayName}
+            onChange={e => setDisplayName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+            autoComplete="username"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-white/50 mb-1.5 block">Mot de passe</label>
+          <input
+            className="input"
+            type="password"
+            placeholder="••••••••"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+            autoComplete="current-password"
+          />
+        </div>
+        <button
+          onClick={handleSubmit}
+          disabled={loading || !displayName.trim() || !password}
+          className="btn-primary w-full py-3 text-base"
+        >
+          {loading ? 'Connexion…' : 'Accéder au jeu →'}
+        </button>
         {error && (
-          <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">{error}</div>
+          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">{error}</div>
         )}
       </div>
 
       <p className="mt-6 text-white/20 text-xs">Ligue privée · 10 participants max</p>
+      <a href="/admin-login" className="mt-2 text-white/10 text-xs hover:text-white/30 transition-colors">Admin</a>
     </main>
   )
 }
