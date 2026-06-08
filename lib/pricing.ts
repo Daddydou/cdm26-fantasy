@@ -68,7 +68,9 @@ export const PRICE_PHASES: Record<string, string> = {
   post_demi:  'Après les demies',
 }
 
-/** Vérifie si la composition minimale est respectée */
+export const SQUAD_MAX = { GK: 2, DEF: 5, MID: 5, ATT: 6, TOTAL: 18 } as const
+
+/** Vérifie que les maximums par poste et le total de 18 ne sont pas dépassés */
 export function validateSquad(players: { position: string }[]): {
   valid: boolean
   errors: string[]
@@ -79,11 +81,11 @@ export function validateSquad(players: { position: string }[]): {
   }
 
   const errors: string[] = []
-  if (players.length < 18)     errors.push(`Minimum 18 joueurs requis (${players.length} sélectionnés)`)
-  if (counts.GK < 2)           errors.push(`Minimum 2 gardiens (${counts.GK} sélectionnés)`)
-  if (counts.DEF < 5)          errors.push(`Minimum 5 défenseurs (${counts.DEF} sélectionnés)`)
-  if (counts.MID < 6)          errors.push(`Minimum 6 milieux (${counts.MID} sélectionnés)`)
-  if (counts.ATT < 5)          errors.push(`Minimum 5 attaquants (${counts.ATT} sélectionnés)`)
+  if (players.length > SQUAD_MAX.TOTAL) errors.push(`Maximum ${SQUAD_MAX.TOTAL} joueurs (${players.length} sélectionnés)`)
+  if (counts.GK  > SQUAD_MAX.GK)        errors.push(`Maximum ${SQUAD_MAX.GK} gardiens (${counts.GK} sélectionnés)`)
+  if (counts.DEF > SQUAD_MAX.DEF)       errors.push(`Maximum ${SQUAD_MAX.DEF} défenseurs (${counts.DEF} sélectionnés)`)
+  if (counts.MID > SQUAD_MAX.MID)       errors.push(`Maximum ${SQUAD_MAX.MID} milieux (${counts.MID} sélectionnés)`)
+  if (counts.ATT > SQUAD_MAX.ATT)       errors.push(`Maximum ${SQUAD_MAX.ATT} attaquants (${counts.ATT} sélectionnés)`)
 
   return { valid: errors.length === 0, errors }
 }

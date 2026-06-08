@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Player, Participant, League, PricePhase } from '@/lib/database.types'
-import { POSITION_LABELS, validateSquad } from '@/lib/pricing'
+import { POSITION_LABELS, SQUAD_MAX } from '@/lib/pricing'
 
 type PlayerWithPrice = Player & { current_price: number | null }
 const POSITIONS = ['GK', 'DEF', 'MID', 'ATT'] as const
@@ -155,6 +155,12 @@ export default function DraftPage() {
   if (loading) return <Loading />
 
   const myCount = myPlayerIds.size
+  const mySquadPlayers = players.filter(p => myPlayerIds.has(p.id))
+  const myPosCounts = { GK: 0, DEF: 0, MID: 0, ATT: 0 }
+  for (const p of mySquadPlayers) {
+    if (p.position in myPosCounts) myPosCounts[p.position as keyof typeof myPosCounts]++
+  }
+  const squadFull = myCount >= SQUAD_MAX.TOTAL
 
   return (
     <main className="min-h-screen p-4 max-w-lg mx-auto overflow-x-hidden">
@@ -169,7 +175,7 @@ export default function DraftPage() {
       </div>
 
       {myCount > 0 && (
-        <SquadValidation count={myCount} budget={me?.budget_remaining || 0} players={players.filter(p => myPlayerIds.has(p.id))} />
+        <SquadValidation count={myCount} posCounts={myPosCounts} squadFull={squadFull} />
       )}
 
       {successMsg && <div className="mb-3 p-3 bg-brand-500/10 border border-brand-500/20 rounded-lg text-brand-400 text-sm">{successMsg}</div>}
@@ -191,6 +197,9 @@ export default function DraftPage() {
         {filtered.map(player => {
           const owned = myPlayerIds.has(player.id)
           const canAfford = (me?.budget_remaining || 0) >= (player.current_price || 0)
+          const posMax = SQUAD_MAX[player.position as keyof typeof SQUAD_MAX] as number
+          const posAtMax = myPosCounts[player.position as keyof typeof myPosCounts] >= posMax
+          const canBuy = canAfford && !squadFull && !posAtMax && !!player.current_price
           return (
             <div key={player.id} className={`card p-3 flex items-center gap-3 ${owned ? 'border-brand-500/30 bg-brand-500/5' : ''}`}>
               <div className="w-9 h-9 rounded-full bg-white/10 flex-shrink-0 overflow-hidden">
@@ -219,8 +228,8 @@ export default function DraftPage() {
                     )}
                   </div>
                 ) : (
-                  <button onClick={() => buyPlayer(player)} disabled={!canAfford || buying === player.id || !player.current_price}
-                    className={`btn text-xs py-1.5 px-3 ${canAfford && player.current_price ? 'btn-primary' : 'btn-ghost opacity-40'}`}>
+                  <button onClick={() => buyPlayer(player)} disabled={!canBuy || buying === player.id}
+                    className={`btn text-xs py-1.5 px-3 ${canBuy ? 'btn-primary' : 'btn-ghost opacity-40'}`}>
                     {buying === player.id ? '…' : 'Acheter'}
                   </button>
                 )}
@@ -235,16 +244,34 @@ export default function DraftPage() {
   )
 }
 
-function SquadValidation({ count, budget, players }: { count: number; budget: number; players: PlayerWithPrice[] }) {
-  const { valid, errors } = validateSquad(players)
+function SquadValidation({ count, posCounts, squadFull }: {
+  count: number
+  posCounts: Record<string, number>
+  squadFull: boolean
+}) {
+  const posRows: { pos: string; label: string; max: number }[] = [
+    { pos: 'GK',  label: 'GK',  max: SQUAD_MAX.GK },
+    { pos: 'DEF', label: 'DEF', max: SQUAD_MAX.DEF },
+    { pos: 'MID', label: 'MID', max: SQUAD_MAX.MID },
+    { pos: 'ATT', label: 'ATT', max: SQUAD_MAX.ATT },
+  ]
   return (
-    <div className={`card p-3 mb-4 ${valid ? 'border-brand-500/30 bg-brand-500/5' : 'border-yellow-500/20 bg-yellow-500/5'}`}>
-      <div className="flex items-center gap-2 mb-2">
-        <span>{valid ? '✅' : '⚠️'}</span>
-        <span className="text-xs font-medium text-white">{count} joueurs sélectionnés</span>
+    <div className={`card p-3 mb-4 ${squadFull ? 'border-brand-500/30 bg-brand-500/5' : 'border-white/10 bg-white/5'}`}>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-medium text-white">{count}/18 joueurs</span>
+        {squadFull && <span className="text-xs text-brand-400 font-medium">Équipe complète</span>}
       </div>
-      {!valid && errors.map(e => <p key={e} className="text-xs text-yellow-400 ml-6">· {e}</p>)}
-      {valid && <p className="text-xs text-brand-400 ml-6">Composition valide !</p>}
+      <div className="flex gap-3">
+        {posRows.map(({ pos, label, max }) => {
+          const n = posCounts[pos] ?? 0
+          const full = n >= max
+          return (
+            <span key={pos} className={`text-xs font-mono ${full ? 'text-brand-400' : 'text-white/50'}`}>
+              {n}/{max} {label}
+            </span>
+          )
+        })}
+      </div>
     </div>
   )
 }
