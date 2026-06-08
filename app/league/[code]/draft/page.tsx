@@ -72,6 +72,7 @@ export default function DraftPage() {
           ?? p.fantasy_prices?.find((pr) => pr.phase === 'initial')
         return { ...p, current_price: priceRow?.price ?? null }
       })
+      enriched.sort((a, b) => (b.current_price ?? -1) - (a.current_price ?? -1))
       setPlayers(enriched)
       setLoading(false)
     }
