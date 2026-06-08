@@ -36,12 +36,28 @@ export default function HomePage() {
           return
         }
 
-        // 2. Pas de session — pré-remplir le pseudo si localStorage connu
+        // 2. Pas de session — tenter une reconnexion anonyme si localStorage connu
         const raw = localStorage.getItem(SESSION_KEY)
         if (raw) {
           try {
             const stored = JSON.parse(raw)
             if (stored.authenticated && stored.displayName) {
+              const { data: anon } = await supabase.auth.signInAnonymously()
+              if (anon.user) {
+                const { data } = await supabase.rpc('fantasy_rejoin_league', {
+                  p_display_name: stored.displayName,
+                  p_league_code:  LEAGUE_CODE,
+                })
+                if (!data?.error) {
+                  localStorage.setItem(SESSION_KEY, JSON.stringify({
+                    ...stored,
+                    userId: anon.user.id,
+                  }))
+                  router.push(`/league/${LEAGUE_CODE}`)
+                  return
+                }
+              }
+              // Échec inattendu → pre-remplir et afficher le formulaire
               setDisplayName(stored.displayName)
               setReconnecting(true)
             }
@@ -65,7 +81,7 @@ export default function HomePage() {
       const { data: anon, error: anonErr } = await supabase.auth.signInAnonymously()
       if (anonErr || !anon.user) throw new Error('Connexion anonyme échouée')
 
-      const { data, error: rpcErr } = await supabase.rpc('fantasy_join_league', {
+      const { data, error: rpcErr } = await supabase.rpc('fantasy_rejoin_league', {
         p_display_name: name,
         p_league_code:  LEAGUE_CODE,
       })
