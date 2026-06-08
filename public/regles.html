@@ -3,18 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CDM26 Fantasy — Règles du jeu</title>
-<meta property="og:title" content="CDM26 Fantasy — Règles du jeu">
-<meta property="og:description" content="Fantasy football pour la Coupe du Monde 2026. Budget, transferts, classement — tout ce qu'il faut savoir.">
+<title>CDM26 Fantasy — Rejoins la ligue !</title>
+<meta property="og:title" content="CDM26 Fantasy — Rejoins la ligue !">
+<meta property="og:description" content="Fantasy football pour la Coupe du Monde 2026. Budget 3500 crédits, 18 joueurs max, notes SofaScore. Code : I8FDQU">
 <meta name="theme-color" content="#0a0a0f">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
     --gold: #c9a84c;
     --gold-light: #f0d080;
-    --green: #1a7a4a;
-    --green-light: #2aad66;
+    --green: #2aad66;
     --bg: #0a0a0f;
     --bg2: #12121a;
     --bg3: #1c1c28;
@@ -22,9 +21,7 @@
     --text: #e8e6e0;
     --muted: #7a7870;
   }
-
   * { box-sizing: border-box; margin: 0; padding: 0; }
-
   body {
     font-family: 'DM Sans', sans-serif;
     background: var(--bg);
@@ -32,19 +29,16 @@
     min-height: 100vh;
     overflow-x: hidden;
   }
-
-  /* Background texture */
   body::before {
     content: '';
     position: fixed;
     inset: 0;
     background-image:
       radial-gradient(ellipse 80% 60% at 50% -10%, rgba(201,168,76,0.08) 0%, transparent 70%),
-      radial-gradient(ellipse 40% 40% at 90% 80%, rgba(26,122,74,0.06) 0%, transparent 60%);
+      radial-gradient(ellipse 40% 40% at 90% 80%, rgba(42,173,102,0.06) 0%, transparent 60%);
     pointer-events: none;
     z-index: 0;
   }
-
   .container {
     position: relative;
     z-index: 1;
@@ -56,10 +50,8 @@
   /* HERO */
   .hero {
     text-align: center;
-    padding: 3.5rem 0 3rem;
-    position: relative;
+    padding: 3rem 0 2.5rem;
   }
-
   .hero-badge {
     display: inline-block;
     font-family: 'DM Mono', monospace;
@@ -73,7 +65,6 @@
     margin-bottom: 1.5rem;
     opacity: .8;
   }
-
   .hero-title {
     font-family: 'Bebas Neue', sans-serif;
     font-size: clamp(52px, 14vw, 88px);
@@ -82,62 +73,85 @@
     color: #fff;
     margin-bottom: .5rem;
   }
-
-  .hero-title span {
-    color: var(--gold);
-  }
-
+  .hero-title span { color: var(--gold); }
   .hero-sub {
     font-size: 15px;
     color: var(--muted);
     font-weight: 300;
     margin-bottom: 2rem;
   }
-
   .flag-row {
     display: flex;
     justify-content: center;
     gap: 6px;
-    font-size: 26px;
+    font-size: 24px;
     margin-bottom: 2rem;
     opacity: .7;
+    flex-wrap: wrap;
   }
 
-  /* NOTICE */
-  .notice {
-    background: rgba(201,168,76,0.06);
-    border: 1px solid rgba(201,168,76,0.25);
-    border-radius: 12px;
-    padding: 1rem 1.25rem;
-    display: flex;
-    gap: 12px;
-    align-items: flex-start;
+  /* CTA BOX */
+  .cta-box {
+    background: linear-gradient(135deg, rgba(201,168,76,0.12), rgba(42,173,102,0.08));
+    border: 1px solid rgba(201,168,76,0.4);
+    border-radius: 16px;
+    padding: 1.75rem 1.5rem;
+    text-align: center;
     margin-bottom: 2.5rem;
   }
-
-  .notice-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
-  .notice-text { font-size: 13px; color: #c9a84c; line-height: 1.6; }
-  .notice-text strong { color: var(--gold-light); }
+  .cta-label {
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: .75rem;
+  }
+  .cta-code {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 52px;
+    color: var(--gold-light);
+    letter-spacing: .15em;
+    margin-bottom: 1.25rem;
+    text-shadow: 0 0 30px rgba(201,168,76,0.3);
+  }
+  .cta-btn {
+    display: inline-block;
+    background: var(--green);
+    color: #fff;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    font-size: 16px;
+    padding: 14px 32px;
+    border-radius: 10px;
+    text-decoration: none;
+    letter-spacing: .02em;
+    transition: opacity .15s;
+    margin-bottom: .75rem;
+  }
+  .cta-btn:hover { opacity: .85; }
+  .cta-note {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: .5rem;
+  }
 
   /* SECTION */
   .section { margin-bottom: 2.5rem; }
-
   .section-header {
     display: flex;
     align-items: center;
     gap: 12px;
     margin-bottom: 1rem;
   }
-
   .section-num {
     font-family: 'Bebas Neue', sans-serif;
-    font-size: 32px;
+    font-size: 30px;
     color: var(--gold);
     line-height: 1;
-    opacity: .4;
-    min-width: 28px;
+    opacity: .35;
+    min-width: 26px;
   }
-
   .section-title {
     font-family: 'Bebas Neue', sans-serif;
     font-size: 22px;
@@ -153,76 +167,52 @@
     padding: 1.25rem;
     margin-bottom: .75rem;
   }
-
   .card-title {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 500;
     letter-spacing: .08em;
     text-transform: uppercase;
     color: var(--gold);
     margin-bottom: .6rem;
   }
-
   .card-body {
     font-size: 14px;
     color: #b8b6b0;
     line-height: 1.7;
     font-weight: 300;
   }
-
   .card-body strong { color: var(--text); font-weight: 500; }
 
-  /* STATS GRID */
+  /* STATS */
   .stats-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, 1fr);
     gap: .75rem;
     margin-bottom: .75rem;
   }
-
   .stat-card {
     background: var(--bg3);
     border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 1.25rem 1rem;
+    padding: 1rem .75rem;
     text-align: center;
   }
-
   .stat-val {
     font-family: 'Bebas Neue', sans-serif;
-    font-size: 40px;
+    font-size: 34px;
     color: var(--gold);
     line-height: 1;
     margin-bottom: 4px;
   }
+  .stat-label { font-size: 11px; color: var(--muted); font-weight: 300; }
 
-  .stat-label {
-    font-size: 12px;
-    color: var(--muted);
-    font-weight: 300;
-  }
-
-  /* FORMULA */
-  .formula {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: .75rem 1rem;
-    font-family: 'DM Mono', monospace;
-    font-size: 12px;
-    color: var(--gold-light);
-    margin-top: .75rem;
-    line-height: 1.8;
-  }
-
-  /* POSITION GRID */
+  /* COMPOSITION */
   .pos-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: .5rem;
     margin-top: .75rem;
   }
-
   .pos-card {
     background: var(--bg);
     border: 1px solid var(--border);
@@ -230,120 +220,74 @@
     padding: .75rem .5rem;
     text-align: center;
   }
-
   .pos-abbr {
     font-family: 'Bebas Neue', sans-serif;
-    font-size: 22px;
-    color: var(--green-light);
+    font-size: 20px;
+    color: var(--green);
     margin-bottom: 2px;
   }
-
-  .pos-min {
-    font-size: 11px;
-    color: var(--muted);
-  }
+  .pos-max { font-size: 12px; color: var(--muted); }
 
   /* TIMELINE */
-  .timeline { padding-left: 0; }
-
   .tl-item {
     display: grid;
     grid-template-columns: auto 1fr;
     gap: 0 1rem;
     margin-bottom: 0;
   }
-
-  .tl-left {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-
+  .tl-left { display: flex; flex-direction: column; align-items: center; }
   .tl-dot {
-    width: 10px;
-    height: 10px;
+    width: 10px; height: 10px;
     border-radius: 50%;
     background: var(--gold);
     flex-shrink: 0;
     margin-top: 4px;
   }
-
   .tl-dot.dim { background: var(--bg3); border: 1px solid var(--border); }
-
+  .tl-dot.final { background: var(--green); }
   .tl-line {
-    width: 1px;
-    flex: 1;
+    width: 1px; flex: 1;
     background: var(--border);
     margin: 4px 0;
-    min-height: 24px;
+    min-height: 20px;
   }
-
-  .tl-right { padding-bottom: 1.25rem; }
+  .tl-right { padding-bottom: 1.1rem; }
   .tl-item:last-child .tl-right { padding-bottom: 0; }
-
   .tl-title {
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--text);
-    margin-bottom: 3px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
+    font-size: 13px; font-weight: 500; color: var(--text);
+    margin-bottom: 2px;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   }
-
-  .tl-body {
-    font-size: 13px;
-    color: var(--muted);
-    line-height: 1.6;
-    font-weight: 300;
-  }
+  .tl-body { font-size: 12px; color: var(--muted); line-height: 1.5; font-weight: 300; }
 
   /* BADGE */
   .badge {
-    display: inline-block;
-    font-size: 10px;
-    font-weight: 500;
-    padding: 2px 8px;
-    border-radius: 20px;
-    font-family: 'DM Mono', monospace;
-    letter-spacing: .04em;
+    display: inline-block; font-size: 10px; font-weight: 500;
+    padding: 2px 8px; border-radius: 20px;
+    font-family: 'DM Mono', monospace; letter-spacing: .04em;
   }
-
   .badge-gold { background: rgba(201,168,76,0.15); color: var(--gold); }
-  .badge-green { background: rgba(26,122,74,0.2); color: var(--green-light); }
+  .badge-green { background: rgba(42,173,102,0.2); color: var(--green); }
   .badge-blue { background: rgba(59,130,246,0.15); color: #60a5fa; }
 
   /* RULES LIST */
   .rules-list { list-style: none; }
   .rules-list li {
-    display: flex;
-    gap: 10px;
+    display: flex; gap: 10px;
     padding: .5rem 0;
     border-bottom: 1px solid var(--border);
-    font-size: 13px;
-    color: #b8b6b0;
-    line-height: 1.5;
-    font-weight: 300;
+    font-size: 13px; color: #b8b6b0; line-height: 1.5; font-weight: 300;
   }
   .rules-list li:last-child { border-bottom: none; }
-  .rules-list .check { color: var(--green-light); flex-shrink: 0; font-size: 15px; margin-top: 1px; }
+  .rules-list .check { color: var(--green); flex-shrink: 0; font-size: 14px; margin-top: 2px; }
 
   /* CLASSEMENTS */
-  .classements-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: .75rem;
-  }
-
+  .clas-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
   .clas-card {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1rem;
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 1rem;
   }
-
-  .clas-icon { font-size: 22px; margin-bottom: .4rem; }
+  .clas-icon { font-size: 20px; margin-bottom: .4rem; }
   .clas-title { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: .3rem; }
   .clas-body { font-size: 12px; color: var(--muted); line-height: 1.5; font-weight: 300; }
 
@@ -354,31 +298,23 @@
     margin: 2.5rem 0;
   }
 
-  /* FOOTER */
-  .footer {
+  /* FOOTER CTA */
+  .footer-cta {
     text-align: center;
-    padding-top: 2rem;
-    border-top: 1px solid var(--border);
+    background: linear-gradient(135deg, rgba(201,168,76,0.08), rgba(42,173,102,0.05));
+    border: 1px solid rgba(201,168,76,0.25);
+    border-radius: 16px;
+    padding: 2rem 1.5rem;
+    margin-bottom: 2rem;
   }
-
-  .footer-title {
+  .footer-cta-title {
     font-family: 'Bebas Neue', sans-serif;
-    font-size: 28px;
-    color: var(--gold);
-    margin-bottom: .4rem;
+    font-size: 28px; color: #fff; margin-bottom: .5rem;
   }
+  .footer-cta-sub { font-size: 13px; color: var(--muted); margin-bottom: 1.25rem; }
 
-  .footer-sub {
-    font-size: 13px;
-    color: var(--muted);
-    font-weight: 300;
-  }
-
-  @media (max-width: 480px) {
-    .stats-grid { grid-template-columns: 1fr 1fr; }
-    .classements-grid { grid-template-columns: 1fr 1fr; }
-    .pos-grid { grid-template-columns: repeat(4, 1fr); }
-  }
+  .footer { text-align: center; padding-top: 1rem; }
+  .footer-sub { font-size: 12px; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -389,18 +325,20 @@
     <div class="hero-badge">Coupe du Monde 2026</div>
     <div class="hero-title">CDM26<br><span>Fantasy</span></div>
     <p class="hero-sub">Constitue ton équipe · Accumule des points · Domine le classement</p>
-    <div class="flag-row">🇫🇷🇧🇷🇦🇷🇪🇸🏴󠁧󠁢󠁥󠁮󠁧󠁿🇩🇪🇵🇹🇳🇱🇧🇪🇳🇴</div>
+    <div class="flag-row">🇫🇷🇧🇷🇦🇷🇪🇸🏴󠁧󠁢󠁥󠁮󠁧󠁿🇩🇪🇵🇹🇳🇱🇧🇪🇳🇴🇸🇪🇭🇷🇺🇾🇨🇭🇦🇹</div>
   </div>
 
-  <!-- NOTICE -->
-  <div class="notice">
-    <div class="notice-icon">⏳</div>
-    <div class="notice-text">
-      <strong>Lien de connexion bientôt disponible</strong> — L'application est en cours de tests finaux. Prépare-toi en lisant les règles, le draft ouvrira très prochainement !
-    </div>
+  <!-- CTA -->
+  <div class="cta-box">
+    <div class="cta-label">Code de la ligue</div>
+    <div class="cta-code">I8FDQU</div>
+    <a href="https://cdm26-fantasy.vercel.app/?code=I8FDQU" class="cta-btn">
+      🏆 Rejoindre la ligue →
+    </a>
+    <div class="cta-note">Connexion par lien magique — pas de mot de passe</div>
   </div>
 
-  <!-- 1. PRINCIPE -->
+  <!-- PRINCIPE -->
   <div class="section">
     <div class="section-header">
       <div class="section-num">01</div>
@@ -408,22 +346,26 @@
     </div>
     <div class="card">
       <div class="card-body">
-        Chaque participant reçoit un <strong>budget de départ identique</strong> pour constituer son équipe parmi les 592 joueurs de la Coupe du Monde 2026. Les points correspondent aux <strong>notes SofaScore</strong> de chaque match, cumulées sur tout le tournoi. Celui qui a le plus de points à la fin gagne.
+        Chaque participant reçoit un <strong>budget de 3 500 crédits</strong> pour constituer son équipe parmi les joueurs de la Coupe du Monde 2026. Les points correspondent aux <strong>notes SofaScore</strong> de chaque match, cumulées sur tout le tournoi. Celui qui a le plus de points gagne.
       </div>
     </div>
     <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-val">2050</div>
+        <div class="stat-val">3500</div>
         <div class="stat-label">crédits de départ</div>
       </div>
       <div class="stat-card">
-        <div class="stat-val">592</div>
-        <div class="stat-label">joueurs disponibles</div>
+        <div class="stat-val">18</div>
+        <div class="stat-label">joueurs max</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val">48</div>
+        <div class="stat-label">nations</div>
       </div>
     </div>
   </div>
 
-  <!-- 2. PRIX -->
+  <!-- PRIX -->
   <div class="section">
     <div class="section-header">
       <div class="section-num">02</div>
@@ -432,41 +374,38 @@
     <div class="card">
       <div class="card-title">Comment est calculé le prix ?</div>
       <div class="card-body">
-        Le prix dépend de la valeur Transfermarkt du joueur et de la cote de victoire finale de son équipe.
-        <div class="formula">
-          prix = valeur TM × (1 + 10 ÷ cote de l'équipe)
-        </div>
+        Le prix dépend de la <strong>valeur Transfermarkt</strong> du joueur et de la <strong>cote de victoire finale</strong> de son équipe. Un joueur d'une grande équipe favorite coûte plus cher. Un joueur d'une petite nation coûte peu — mais peut rapporter gros s'il performe.
       </div>
     </div>
     <div class="card">
       <div class="card-title">Les prix évoluent pendant le tournoi</div>
       <div class="card-body">
-        Après chaque phase éliminatoire, les prix sont recalculés. Les joueurs des équipes encore en lice s'apprécient, ceux des équipes éliminées perdent de la valeur. Les performances individuelles pendant la phase influencent aussi le prix.
+        Après chaque phase éliminatoire, les prix sont recalculés. Les joueurs des équipes encore en lice s'apprécient — ceux des équipes éliminées perdent de la valeur. Les performances individuelles influencent aussi le prix.
       </div>
     </div>
   </div>
 
-  <!-- 3. COMPOSITION -->
+  <!-- COMPOSITION -->
   <div class="section">
     <div class="section-header">
       <div class="section-num">03</div>
       <div class="section-title">Composition de l'équipe</div>
     </div>
     <div class="card">
-      <div class="card-body">Minimum <strong>18 joueurs</strong> obligatoires :</div>
+      <div class="card-body"><strong>18 joueurs maximum</strong>, avec les limites suivantes par poste :</div>
       <div class="pos-grid">
-        <div class="pos-card"><div class="pos-abbr">GK</div><div class="pos-min">2 min</div></div>
-        <div class="pos-card"><div class="pos-abbr">DEF</div><div class="pos-min">5 min</div></div>
-        <div class="pos-card"><div class="pos-abbr">MID</div><div class="pos-min">6 min</div></div>
-        <div class="pos-card"><div class="pos-abbr">ATT</div><div class="pos-min">5 min</div></div>
+        <div class="pos-card"><div class="pos-abbr">GK</div><div class="pos-max">max 2</div></div>
+        <div class="pos-card"><div class="pos-abbr">DEF</div><div class="pos-max">max 5</div></div>
+        <div class="pos-card"><div class="pos-abbr">MID</div><div class="pos-max">max 5</div></div>
+        <div class="pos-card"><div class="pos-abbr">ATT</div><div class="pos-max">max 6</div></div>
       </div>
       <div class="card-body" style="margin-top:.9rem">
-        Pas de limite maximale — achète autant de joueurs que ton budget le permet. <strong>Plusieurs participants peuvent avoir le même joueur.</strong>
+        Tu n'es pas obligé de remplir tous les postes. <strong>Plusieurs participants peuvent avoir le même joueur.</strong>
       </div>
     </div>
   </div>
 
-  <!-- 4. POINTS -->
+  <!-- POINTS -->
   <div class="section">
     <div class="section-header">
       <div class="section-num">04</div>
@@ -484,7 +423,7 @@
     </div>
   </div>
 
-  <!-- 5. TRANSFERTS -->
+  <!-- TRANSFERTS -->
   <div class="section">
     <div class="section-header">
       <div class="section-num">05</div>
@@ -492,21 +431,21 @@
     </div>
     <div class="card">
       <div class="card-body" style="margin-bottom:1rem">
-        Après chaque grande phase, une fenêtre de transferts s'ouvre. Tu peux <strong>vendre et racheter des joueurs</strong> avec ton budget disponible. La revente se fait au <strong>prix réévalué</strong> au moment de la vente.
+        Après chaque grande phase, une fenêtre de transferts s'ouvre. Tu peux <strong>vendre et racheter des joueurs</strong>. La revente se fait au <strong>prix réévalué</strong> au moment de la vente.
       </div>
       <div class="timeline">
         <div class="tl-item">
           <div class="tl-left"><div class="tl-dot"></div><div class="tl-line"></div></div>
           <div class="tl-right">
             <div class="tl-title">Draft initial <span class="badge badge-blue">avant le 11 juin</span></div>
-            <div class="tl-body">Constitution de ton équipe. Tous les participants achètent en même temps.</div>
+            <div class="tl-body">Constitution de ton équipe de 18 joueurs max.</div>
           </div>
         </div>
         <div class="tl-item">
           <div class="tl-left"><div class="tl-dot dim"></div><div class="tl-line"></div></div>
           <div class="tl-right">
             <div class="tl-title">Transfert #1 <span class="badge badge-gold">après la phase de poule</span></div>
-            <div class="tl-body">Vendre / racheter. Prix recalculés selon performances et cotes mises à jour.</div>
+            <div class="tl-body">Vendre / racheter. Prix recalculés selon performances.</div>
           </div>
         </div>
         <div class="tl-item">
@@ -531,47 +470,31 @@
           </div>
         </div>
         <div class="tl-item">
-          <div class="tl-left"><div class="tl-dot" style="background:var(--green-light)"></div></div>
+          <div class="tl-left"><div class="tl-dot final"></div></div>
           <div class="tl-right">
             <div class="tl-title">Finale <span class="badge badge-green">19 juillet 2026</span></div>
-            <div class="tl-body">Classement final arrêté après le coup de sifflet final.</div>
+            <div class="tl-body">Classement final arrêté après le coup de sifflet.</div>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- 6. CLASSEMENTS -->
+  <!-- CLASSEMENTS -->
   <div class="section">
     <div class="section-header">
       <div class="section-num">06</div>
       <div class="section-title">Classements</div>
     </div>
-    <div class="classements-grid">
-      <div class="clas-card">
-        <div class="clas-icon">🏆</div>
-        <div class="clas-title">Général</div>
-        <div class="clas-body">Total des notes cumulées sur tout le tournoi.</div>
-      </div>
-      <div class="clas-card">
-        <div class="clas-icon">📈</div>
-        <div class="clas-title">Value for Money</div>
-        <div class="clas-body">Points / crédits dépensés. Qui a eu le meilleur nez ?</div>
-      </div>
-      <div class="clas-card">
-        <div class="clas-icon">📅</div>
-        <div class="clas-title">Par journée</div>
-        <div class="clas-body">Qui a eu les meilleurs joueurs ce jour-là ?</div>
-      </div>
-      <div class="clas-card">
-        <div class="clas-icon">📋</div>
-        <div class="clas-title">Historique</div>
-        <div class="clas-body">Tous les transferts de la ligue visibles après le draft.</div>
-      </div>
+    <div class="clas-grid">
+      <div class="clas-card"><div class="clas-icon">🏆</div><div class="clas-title">Général</div><div class="clas-body">Total des notes cumulées sur tout le tournoi.</div></div>
+      <div class="clas-card"><div class="clas-icon">📈</div><div class="clas-title">Value for Money</div><div class="clas-body">Points / crédits dépensés. Meilleur nez ?</div></div>
+      <div class="clas-card"><div class="clas-icon">📅</div><div class="clas-title">Par journée</div><div class="clas-body">Meilleurs joueurs ce jour-là.</div></div>
+      <div class="clas-card"><div class="clas-icon">📋</div><div class="clas-title">Transferts</div><div class="clas-body">Historique de tous les achats/ventes.</div></div>
     </div>
   </div>
 
-  <!-- 7. RÈGLES -->
+  <!-- RÈGLES -->
   <div class="section">
     <div class="section-header">
       <div class="section-num">07</div>
@@ -580,21 +503,28 @@
     <div class="card">
       <ul class="rules-list">
         <li><span class="check">✓</span>Ligue privée — maximum 10 participants</li>
+        <li><span class="check">✓</span>Maximum 18 joueurs par équipe (2 GK · 5 DEF · 5 MID · 6 ATT)</li>
         <li><span class="check">✓</span>Un même joueur peut être dans plusieurs équipes</li>
-        <li><span class="check">✓</span>Impossible d'acheter deux fois le même joueur dans sa propre équipe</li>
         <li><span class="check">✓</span>Les équipes des autres sont masquées pendant le draft et les transferts</li>
-        <li><span class="check">✓</span>Impossible de vendre si ça fait descendre sous les minimums de composition</li>
-        <li><span class="check">✓</span>Connexion par lien magique envoyé par email — pas de mot de passe</li>
+        <li><span class="check">✓</span>La revente se fait au prix réévalué (pas le prix d'achat)</li>
+        <li><span class="check">✓</span>Connexion par lien magique email — pas de mot de passe</li>
       </ul>
     </div>
   </div>
 
   <div class="divider"></div>
 
-  <!-- FOOTER -->
+  <!-- FOOTER CTA -->
+  <div class="footer-cta">
+    <div class="footer-cta-title">Prêt à jouer ? 🏆</div>
+    <div class="footer-cta-sub">Code de ligue : <strong style="color:var(--gold-light);font-family:'DM Mono',monospace;font-size:15px">I8FDQU</strong></div>
+    <a href="https://cdm26-fantasy.vercel.app/?code=I8FDQU" class="cta-btn">
+      Rejoindre la ligue →
+    </a>
+  </div>
+
   <div class="footer">
-    <div class="footer-title">Bonne chance à tous ⚽</div>
-    <p class="footer-sub">Ligue privée CDM26 Fantasy · Coupe du Monde 2026</p>
+    <p class="footer-sub">CDM26 Fantasy · Ligue privée · Coupe du Monde 2026</p>
   </div>
 
 </div>
