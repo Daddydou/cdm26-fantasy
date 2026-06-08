@@ -4,25 +4,31 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
-const LEAGUE_CODE = 'I8FDQU'
-const PASSWORD    = 'CDM2026'
-const SESSION_KEY = 'cdm26_session'
+const LEAGUE_CODE  = process.env.NEXT_PUBLIC_LEAGUE_CODE ?? 'I8FDQU'
+const APP_PASSWORD = 'CDM2026'
+const ADMIN_EMAIL  = 'lolo.rms@gmail.com'
+const ADMIN_PASS   = 'CDM2026fantasy2026'
+const SESSION_KEY  = 'cdm26_session'
 
 export default function HomePage() {
   const router = useRouter()
-  const [displayName, setDisplayName] = useState('')
-  const [password, setPassword]       = useState('')
-  const [loading, setLoading]         = useState(false)
-  const [error, setError]             = useState('')
-  const [checking, setChecking]       = useState(true)
-  const [reconnecting, setReconnecting] = useState(false)
+  const [identifier, setIdentifier] = useState('')
+  const [password, setPassword]     = useState('')
+  const [loading, setLoading]       = useState(false)
+  const [error, setError]           = useState('')
+  const [checking, setChecking]     = useState(true)
 
   useEffect(() => {
     async function tryAutoLogin() {
       try {
-        // 1. Session Supabase valide (anon persisté ou admin magic link)
+        // 1. Session Supabase valide
         const { data: { session } } = await supabase.auth.getSession()
         if (session) {
+          if (session.user.email === ADMIN_EMAIL) {
+            router.push(`/league/${LEAGUE_CODE}`)
+            return
+          }
+          // Utilisateur anonyme — retrouver la ligue via le participant
           const { data: p } = await supabase
             .from('fantasy_participants')
             .select('fantasy_leagues(code)')
@@ -31,37 +37,37 @@ export default function HomePage() {
             .single()
           const code = (p?.fantasy_leagues as any)?.code
           if (code) { router.push(`/league/${code}`); return }
-          // Session sans ligue (cas rare) → afficher le formulaire
           setChecking(false)
           return
         }
 
-        // 2. Pas de session — tenter une reconnexion anonyme si localStorage connu
+        // 2. Pas de session — tenter une reconnexion via localStorage
         const raw = localStorage.getItem(SESSION_KEY)
-        if (raw) {
-          try {
-            const stored = JSON.parse(raw)
-            if (stored.authenticated && stored.displayName) {
-              const { data: anon } = await supabase.auth.signInAnonymously()
-              if (anon.user) {
-                const { data } = await supabase.rpc('fantasy_rejoin_league', {
-                  p_display_name: stored.displayName,
-                  p_league_code:  LEAGUE_CODE,
-                })
-                if (!data?.error) {
-                  localStorage.setItem(SESSION_KEY, JSON.stringify({
-                    ...stored,
-                    userId: anon.user.id,
-                  }))
-                  router.push(`/league/${LEAGUE_CODE}`)
-                  return
-                }
-              }
-              // Échec inattendu → pre-remplir et afficher le formulaire
-              setDisplayName(stored.displayName)
-              setReconnecting(true)
+        if (!raw) { setChecking(false); return }
+
+        const stored = JSON.parse(raw)
+        if (!stored.authenticated) { setChecking(false); return }
+
+        if (stored.isAdmin) {
+          const { error: signInErr } = await supabase.auth.signInWithPassword({
+            email: ADMIN_EMAIL,
+            password: ADMIN_PASS,
+          })
+          if (!signInErr) { router.push(`/league/${LEAGUE_CODE}`); return }
+        } else if (stored.displayName) {
+          const { data: anon } = await supabase.auth.signInAnonymously()
+          if (anon.user) {
+            const { data } = await supabase.rpc('fantasy_rejoin_league', {
+              p_display_name: stored.displayName,
+              p_league_code:  LEAGUE_CODE,
+            })
+            if (!data?.error) {
+              localStorage.setItem(SESSION_KEY, JSON.stringify({ ...stored, userId: anon.user.id }))
+              router.push(`/league/${LEAGUE_CODE}`)
+              return
             }
-          } catch {}
+          }
+          setIdentifier(stored.displayName)
         }
         setChecking(false)
       } catch {
@@ -72,29 +78,58 @@ export default function HomePage() {
   }, [router])
 
   async function handleSubmit() {
-    const name = displayName.trim()
-    if (!name || !password) return
-    if (password !== PASSWORD) { setError('Mot de passe incorrect'); return }
+    const id = identifier.trim()
+    if (!id || !password) return
+    if (password !== APP_PASSWORD) { setError('Mot de passe incorrect'); return }
     setLoading(true)
     setError('')
     try {
-      const { data: anon, error: anonErr } = await supabase.auth.signInAnonymously()
-      if (anonErr || !anon.user) throw new Error('Connexion anonyme échouée')
+      if (id === ADMIN_EMAIL) {
+        // Connexion admin
+        let { error: signInErr } = await supabase.auth.signInWithPassword({
+          email: ADMIN_EMAIL,
+          password: ADMIN_PASS,
+        })
+        if (signInErr) {
+          // Premier accès — créer le compte puis se connecter
+          const { error: signUpErr } = await supabase.auth.signUp({
+            email: ADMIN_EMAIL,
+            password: ADMIN_PASS,
+          })
+          if (signUpErr) throw signUpErr
+          const { error: retryErr } = await supabase.auth.signInWithPassword({
+            email: ADMIN_EMAIL,
+            password: ADMIN_PASS,
+          })
+          if (retryErr) throw retryErr
+        }
+        localStorage.setItem(SESSION_KEY, JSON.stringify({
+          authenticated: true,
+          isAdmin:       true,
+          leagueCode:    LEAGUE_CODE,
+        }))
+        router.push(`/league/${LEAGUE_CODE}`)
+      } else {
+        // Connexion joueur anonyme
+        const { data: anon, error: anonErr } = await supabase.auth.signInAnonymously()
+        if (anonErr || !anon.user) throw new Error('Connexion anonyme échouée')
 
-      const { data, error: rpcErr } = await supabase.rpc('fantasy_rejoin_league', {
-        p_display_name: name,
-        p_league_code:  LEAGUE_CODE,
-      })
-      if (rpcErr) throw rpcErr
-      if (data?.error) throw new Error(data.error)
+        const { data, error: rpcErr } = await supabase.rpc('fantasy_rejoin_league', {
+          p_display_name: id,
+          p_league_code:  LEAGUE_CODE,
+        })
+        if (rpcErr) throw rpcErr
+        if (data?.error) throw new Error(data.error)
 
-      localStorage.setItem(SESSION_KEY, JSON.stringify({
-        authenticated: true,
-        userId:        anon.user.id,
-        displayName:   name,
-        leagueCode:    LEAGUE_CODE,
-      }))
-      router.push(`/league/${LEAGUE_CODE}`)
+        localStorage.setItem(SESSION_KEY, JSON.stringify({
+          authenticated: true,
+          isAdmin:       false,
+          userId:        anon.user.id,
+          displayName:   id,
+          leagueCode:    LEAGUE_CODE,
+        }))
+        router.push(`/league/${LEAGUE_CODE}`)
+      }
     } catch (e) {
       setError((e as Error).message)
       setLoading(false)
@@ -116,18 +151,13 @@ export default function HomePage() {
       </div>
 
       <div className="card w-full max-w-md p-6 space-y-4">
-        {reconnecting && (
-          <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-yellow-300 text-xs">
-            Reconnexion nécessaire — entre ton mot de passe pour continuer
-          </div>
-        )}
         <div>
-          <label className="text-xs text-white/50 mb-1.5 block">Ton pseudo</label>
+          <label className="text-xs text-white/50 mb-1.5 block">Ton identifiant</label>
           <input
             className="input"
-            placeholder="MonPseudo"
-            value={displayName}
-            onChange={e => setDisplayName(e.target.value)}
+            placeholder="Pseudo ou email"
+            value={identifier}
+            onChange={e => setIdentifier(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSubmit()}
             autoComplete="username"
           />
@@ -146,7 +176,7 @@ export default function HomePage() {
         </div>
         <button
           onClick={handleSubmit}
-          disabled={loading || !displayName.trim() || !password}
+          disabled={loading || !identifier.trim() || !password}
           className="btn-primary w-full py-3 text-base"
         >
           {loading ? 'Connexion…' : 'Accéder au jeu →'}
@@ -157,7 +187,6 @@ export default function HomePage() {
       </div>
 
       <p className="mt-6 text-white/20 text-xs">Ligue privée · 10 participants max</p>
-      <a href="/admin-login" className="mt-2 text-white/10 text-xs hover:text-white/30 transition-colors">Admin</a>
     </main>
   )
 }
