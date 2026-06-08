@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CDM26 — Comment se connecter</title>
+<meta property="og:title" content="CDM26 — Comment se connecter">
+<meta property="og:description" content="Tout ce qu'il faut savoir pour rejoindre les deux jeux CDM 2026.">
+<meta name="theme-color" content="#0a0a0f">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #c9a84c;
+    --gold-light: #f0d080;
+    --green: #2aad66;
+    --blue: #3b82f6;
+    --bg: #0a0a0f;
+    --bg2: #12121a;
+    --bg3: #1c1c28;
+    --border: rgba(201,168,76,0.15);
+    --text: #e8e6e0;
+    --muted: #7a7870;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(201,168,76,0.07) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 620px;
+    margin: 0 auto;
+    padding: 0 1.25rem 4rem;
+  }
+
+  /* HERO */
+  .hero {
+    text-align: center;
+    padding: 2.5rem 0 2rem;
+  }
+  .hero-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(42px, 12vw, 72px);
+    color: #fff;
+    line-height: .9;
+    margin-bottom: .5rem;
+  }
+  .hero-title span { color: var(--gold); }
+  .hero-sub { font-size: 14px; color: var(--muted); font-weight: 300; }
+
+  /* PASSWORD BOX */
+  .pwd-box {
+    background: linear-gradient(135deg, rgba(42,173,102,0.1), rgba(42,173,102,0.05));
+    border: 1px solid rgba(42,173,102,0.3);
+    border-radius: 14px;
+    padding: 1.25rem 1.5rem;
+    text-align: center;
+    margin: 1.5rem 0;
+  }
+  .pwd-label { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: .5rem; font-family: 'DM Mono', monospace; }
+  .pwd-value { font-family: 'Bebas Neue', sans-serif; font-size: 42px; color: #fff; letter-spacing: .1em; margin-bottom: .25rem; }
+  .pwd-note { font-size: 12px; color: var(--muted); }
+
+  /* GAME CARD */
+  .game { margin-bottom: 1.5rem; }
+  .game-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 1rem;
+  }
+  .game-icon { font-size: 28px; }
+  .game-title { font-family: 'Bebas Neue', sans-serif; font-size: 24px; letter-spacing: .05em; color: #fff; }
+  .game-desc { font-size: 12px; color: var(--muted); margin-top: 1px; }
+
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: .75rem;
+  }
+
+  /* STEPS */
+  .steps { padding: 1rem 1.25rem; }
+  .step {
+    display: flex;
+    gap: 12px;
+    padding: .6rem 0;
+    border-bottom: .5px solid rgba(255,255,255,0.05);
+    align-items: flex-start;
+  }
+  .step:last-child { border-bottom: none; }
+  .step-num {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--bg3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--gold);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .step-text { font-size: 13px; color: var(--text); line-height: 1.5; flex: 1; }
+  .step-text strong { color: #fff; }
+  .step-sub { font-size: 11px; color: var(--muted); margin-top: 2px; font-family: 'DM Mono', monospace; }
+
+  /* CTA BUTTON */
+  .cta {
+    display: block;
+    background: var(--green);
+    color: #fff;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 15px;
+    padding: 13px 20px;
+    text-align: center;
+    border-radius: 10px;
+    margin: .75rem 0;
+    transition: opacity .15s;
+  }
+  .cta:hover { opacity: .85; }
+  .cta.blue { background: var(--blue); }
+
+  /* CODE BADGE */
+  .code-badge {
+    display: inline-block;
+    font-family: 'DM Mono', monospace;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--gold-light);
+    background: rgba(201,168,76,0.1);
+    border: 1px solid rgba(201,168,76,0.3);
+    padding: 4px 14px;
+    border-radius: 8px;
+    letter-spacing: .1em;
+  }
+
+  /* INFO BOX */
+  .info {
+    background: var(--bg3);
+    border-radius: 8px;
+    padding: .75rem 1rem;
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin: .5rem 0;
+  }
+  .info strong { color: var(--text); }
+
+  .divider {
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--border), transparent);
+    margin: 2rem 0;
+  }
+
+  .footer { text-align: center; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="hero">
+    <div class="flag-row" style="font-size:22px;margin-bottom:1rem;opacity:.7">🇫🇷🇧🇷🇦🇷🇪🇸🏴󠁧󠁢󠁥󠁮󠁧󠁿🇩🇪🇸🇪🇳🇴🇵🇹</div>
+    <div class="hero-title">CDM26<br><span>Comment jouer</span></div>
+    <p class="hero-sub">Coupe du Monde 2026 · Deux jeux · Un seul mot de passe</p>
+  </div>
+
+  <!-- MOT DE PASSE COMMUN -->
+  <div class="pwd-box">
+    <div class="pwd-label">Mot de passe pour les deux jeux</div>
+    <div class="pwd-value">CDM2026</div>
+    <div class="pwd-note">Le même pour tout le monde — à ne pas partager hors du groupe</div>
+  </div>
+
+  <!-- JEU 1 : FANTASY -->
+  <div class="game">
+    <div class="game-header">
+      <div class="game-icon">🏆</div>
+      <div>
+        <div class="game-title">CDM26 Fantasy</div>
+        <div class="game-desc">Achète des joueurs · Accumule des points · Gagne le classement</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-text">
+            Ouvre le lien ci-dessous
+            <div class="step-sub">cdm26-fantasy.vercel.app</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-text">
+            Entre <strong>ton pseudo</strong> (le nom que les autres verront)
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-text">
+            Entre le mot de passe <strong>CDM2026</strong>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-text">
+            Clique <strong>Accéder au jeu →</strong>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">5</div>
+          <div class="step-text">
+            Achète tes joueurs avant le coup d'envoi du 11 juin !
+            <div class="step-sub">Budget : 3 500 crédits · Max 18 joueurs</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="info">
+      Code de ligue : <span class="code-badge">I8FDQU</span><br>
+      <strong>Règles complètes</strong> disponibles sur le site
+    </div>
+
+    <a href="https://cdm26-fantasy.vercel.app" class="cta">
+      Rejoindre CDM26 Fantasy →
+    </a>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- JEU 2 : PICKS -->
+  <div class="game">
+    <div class="game-header">
+      <div class="game-icon">⚽</div>
+      <div>
+        <div class="game-title">CDM26 Picks</div>
+        <div class="game-desc">Pronostique chaque match · Gagne des points · Domine le groupe</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-text">
+            Ouvre le lien ci-dessous
+            <div class="step-sub">cdm26-iota.vercel.app</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-text">
+            Entre <strong>ton pseudo</strong>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-text">
+            Entre le mot de passe <strong>CDM2026</strong>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-text">
+            Clique <strong>Accéder au jeu →</strong>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">5</div>
+          <div class="step-text">
+            Fais tes pronostics avant chaque match !
+            <div class="step-sub">Les picks se ferment au coup d'envoi</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <a href="https://cdm26-iota.vercel.app" class="cta blue">
+      Rejoindre CDM26 Picks →
+    </a>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- CONSEILS -->
+  <div class="card" style="margin-bottom:1.5rem">
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">💡</div>
+        <div class="step-text">
+          <strong>Ajoute les apps à ton écran d'accueil</strong>
+          <div class="step-sub">Safari/Chrome → Partager → Sur l'écran d'accueil</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">🔑</div>
+        <div class="step-text">
+          <strong>Retiens bien ton pseudo</strong> — c'est ton identifiant pour te reconnecter
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">⏰</div>
+        <div class="step-text">
+          <strong>Fantasy : draft avant le 11 juin 20h</strong>
+          <div class="step-sub">Le draft ferme avant le coup d'envoi Mexique vs Afrique du Sud</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    CDM26 · Coupe du Monde 2026 · Ligue privée
+  </div>
+
+</div>
+</body>
+</html>
