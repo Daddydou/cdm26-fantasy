@@ -20,12 +20,24 @@ export default function HomePage() {
   const [checking, setChecking] = useState(true)
   const [isCreate, setIsCreate] = useState(false)
   const [loggedIn, setLoggedIn] = useState(false)
+  const [needsReconnect, setNeedsReconnect] = useState(false)
 
   useEffect(() => {
     async function tryAutoLogin() {
       try {
         const { data: { user } } = await supabase.auth.getUser()
-        if (!user) { setChecking(false); return }
+        if (!user) {
+          // Mode standalone iOS : session perdue — pré-remplir le code si disponible
+          const savedCode = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY)
+          if (savedCode) {
+            setCode(savedCode)
+            setIsCreate(false)
+            setNeedsReconnect(true)
+            setStep('email')
+          }
+          setChecking(false)
+          return
+        }
 
         // Session valide — trouver sa ligue
         const savedCode = localStorage.getItem(STORAGE_KEY)
@@ -69,7 +81,6 @@ export default function HomePage() {
           } catch {}
         }
 
-        // Batché avec setChecking pour garantir un seul rendu cohérent
         setLoggedIn(true)
         setChecking(false)
       } catch {
@@ -127,6 +138,7 @@ export default function HomePage() {
       }
 
       localStorage.setItem(STORAGE_KEY, league.code)
+      sessionStorage.setItem(STORAGE_KEY, league.code)
       router.push(`/league/${league.code}`)
     } catch (e) {
       setError((e as Error).message)
@@ -164,6 +176,7 @@ export default function HomePage() {
       })
 
       localStorage.setItem(STORAGE_KEY, leagueCode)
+      sessionStorage.setItem(STORAGE_KEY, leagueCode)
       router.push(`/league/${leagueCode}`)
     } catch (e) {
       setError((e as Error).message)
@@ -205,7 +218,13 @@ export default function HomePage() {
         {/* Étape 2 : email */}
         {step === 'email' && (
           <div className="space-y-4">
-            <button onClick={() => setStep('home')} className="text-white/40 text-sm hover:text-white">← Retour</button>
+            {needsReconnect ? (
+              <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-yellow-300 text-xs">
+                Reconnexion nécessaire — entre ton email pour recevoir un nouveau lien
+              </div>
+            ) : (
+              <button onClick={() => setStep('home')} className="text-white/40 text-sm hover:text-white">← Retour</button>
+            )}
             <div>
               <label className="text-xs text-white/50 mb-1.5 block">Ton adresse email</label>
               <input className="input" type="email" placeholder="toi@email.com"

@@ -8,7 +8,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(`Missing Supabase config: url=${supabaseUrl}, key=${supabaseAnonKey?.slice(0,10)}`)
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    storageKey: 'cdm26-auth',
+    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+  },
+})
 
 export const supabaseAdmin = createClient<Database>(
   supabaseUrl,
