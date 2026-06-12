@@ -59,6 +59,20 @@ export default function PredictionsPage() {
     ? (me.total_remaining_matches / me.player_count).toFixed(1)
     : null
 
+  // Calcul des % de chances de gagner
+  const totalProjected = predictions.reduce((s, p) => s + p.projected_total, 0)
+  const allEqual = predictions.every(p => p.projected_total === predictions[0]?.projected_total)
+  const equalPct = predictions.length > 0 ? Math.round((100 / predictions.length) * 10) / 10 : 0
+
+  const winPct = (projected: number): number => {
+    if (predictions.length === 0) return 0
+    if (allEqual || totalProjected === 0) return equalPct
+    return Math.round((projected / totalProjected) * 1000) / 10
+  }
+
+  const barColor = (i: number) =>
+    i === 0 ? 'bg-yellow-400' : i === 1 ? 'bg-gray-300' : i === 2 ? 'bg-amber-600' : 'bg-white/20'
+
   return (
     <main className="min-h-screen p-4 max-w-lg mx-auto">
       <div className="flex items-center gap-3 mb-5">
@@ -92,16 +106,17 @@ export default function PredictionsPage() {
       ) : (
         <div className="space-y-2">
           {predictions.map((p, i) => {
-            const isLeader = i === 0
             const isMe = p.participant_id === myId
             const gap = leader ? p.projected_total - leader.projected_total : 0
             const avgRemaining = p.player_count > 0
               ? (p.total_remaining_matches / p.player_count).toFixed(1)
               : '0'
+            const pct = winPct(p.projected_total)
+            const maxPct = winPct(predictions[0]?.projected_total ?? 0)
 
             return (
               <div key={p.participant_id} className={`card p-4 ${isMe ? 'border-brand-500/30 bg-brand-500/5' : ''}`}>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 mb-2">
                   <span className={`w-6 text-center text-sm font-bold flex-shrink-0 ${
                     i === 0 ? 'text-yellow-400' : i === 1 ? 'text-gray-300' : i === 2 ? 'text-amber-600' : 'text-white/30'
                   }`}>
@@ -111,7 +126,6 @@ export default function PredictionsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-medium text-white truncate">{p.display_name}</span>
-                      {isLeader && <span className="text-xs">🏆</span>}
                       {isMe && <span className="text-xs text-brand-400 font-medium">(toi)</span>}
                     </div>
                     <p className="text-xs text-white/40 mt-0.5">
@@ -122,14 +136,21 @@ export default function PredictionsPage() {
                     </p>
                   </div>
 
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-base font-bold text-white">{p.projected_total.toFixed(1)}</p>
-                    {isLeader ? (
-                      <p className="text-xs text-yellow-400">favori</p>
-                    ) : (
-                      <p className="text-xs text-red-400">{gap.toFixed(1)}</p>
-                    )}
+                  <div className="text-right flex-shrink-0 min-w-[70px]">
+                    <p className={`text-lg font-bold ${i === 0 ? 'text-yellow-400' : 'text-white'}`}>
+                      {pct.toFixed(1)}%
+                    </p>
+                    <p className="text-xs text-white/30">{p.projected_total.toFixed(1)} pts</p>
+                    {i > 0 && <p className="text-xs text-red-400">{gap.toFixed(1)}</p>}
                   </div>
+                </div>
+
+                {/* Barre de progression */}
+                <div className="ml-9 bg-white/5 rounded-full h-1.5">
+                  <div
+                    className={`h-1.5 rounded-full transition-all ${barColor(i)}`}
+                    style={{ width: `${maxPct > 0 ? (pct / maxPct) * 100 : 0}%` }}
+                  />
                 </div>
               </div>
             )
