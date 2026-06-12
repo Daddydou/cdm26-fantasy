@@ -262,13 +262,20 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    if (scores.length > 0) {
-      console.log('[import] données à insérer (3 premiers):', JSON.stringify(scores.slice(0, 3)))
+    const seen = new Set<string>()
+    const deduped = scores.filter(r => {
+      if (seen.has(r.player_id)) return false
+      seen.add(r.player_id)
+      return true
+    })
+
+    if (deduped.length > 0) {
+      console.log('[import] données à insérer (3 premiers):', JSON.stringify(deduped.slice(0, 3)))
       const { error: upsertErr } = await supabaseAdmin
         .from('fantasy_scores')
-        .upsert(scores, { onConflict: 'player_id,match_id' })
-      console.log('[import] INSERT résultat:', upsertErr ? 0 : scores.length, 'erreur:', upsertErr?.message, 'code:', upsertErr?.code)
-      if (!upsertErr) imported += scores.length
+        .upsert(deduped, { onConflict: 'player_id,match_id' })
+      console.log('[import] INSERT résultat:', upsertErr ? 0 : deduped.length, 'erreur:', upsertErr?.message, 'code:', upsertErr?.code)
+      if (!upsertErr) imported += deduped.length
     }
 
     await supabaseAdmin
