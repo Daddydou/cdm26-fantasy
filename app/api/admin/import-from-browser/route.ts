@@ -263,9 +263,11 @@ export async function POST(req: NextRequest) {
     }
 
     if (scores.length > 0) {
+      console.log('[import] données à insérer (3 premiers):', JSON.stringify(scores.slice(0, 3)))
       const { error: upsertErr } = await supabaseAdmin
         .from('fantasy_scores')
         .upsert(scores, { onConflict: 'player_id,match_id' })
+      console.log('[import] INSERT résultat:', upsertErr ? 0 : scores.length, 'erreur:', upsertErr?.message, 'code:', upsertErr?.code)
       if (!upsertErr) imported += scores.length
     }
 
