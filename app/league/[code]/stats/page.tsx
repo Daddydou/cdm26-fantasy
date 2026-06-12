@@ -56,6 +56,7 @@ const LINE_COLORS = [
 export default function StatsPage() {
   const { code } = useParams<{ code: string }>()
   const router = useRouter()
+  const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [posFilter, setPosFilter] = useState<PosFilter>('ALL')
@@ -64,38 +65,55 @@ export default function StatsPage() {
   const [myId, setMyId] = useState<string | null>(null)
   const [leagueName, setLeagueName] = useState('')
 
+  // Guard recharts against SSR (uses ResizeObserver / DOM APIs)
+  useEffect(() => { setMounted(true) }, [])
+
   useEffect(() => {
     async function load() {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { router.push('/'); return }
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) { router.push('/'); return }
 
-      const { data: lg } = await supabase
-        .from('fantasy_leagues').select().eq('code', code).single()
-      if (!lg) { router.push('/'); return }
-      setLeagueName(lg.name)
+        const { data: lg } = await supabase
+          .from('fantasy_leagues').select().eq('code', code).single()
+        if (!lg) { router.push('/'); return }
+        setLeagueName((lg as { name: string }).name)
 
-      const { data: p } = await supabase
-        .from('fantasy_participants').select()
-        .eq('league_id', lg.id).eq('user_id', session.user.id).single()
-      if (!p) { router.push('/'); return }
-      setMyId(p.id)
+        const { data: p } = await supabase
+          .from('fantasy_participants').select()
+          .eq('league_id', (lg as { id: string }).id)
+          .eq('user_id', session.user.id)
+          .single()
+        if (!p) { router.push('/'); return }
+        setMyId((p as { id: string }).id)
 
-      const res = await fetch(`/api/league/${code}/stats`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      })
-      if (!res.ok) { setError('Erreur lors du chargement des stats'); setLoading(false); return }
+        const res = await fetch(`/api/league/${code}/stats`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        })
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          console.error('[stats] API error', res.status, body)
+          setError(`Erreur lors du chargement des stats (${res.status})`)
+          setLoading(false)
+          return
+        }
 
-      const json = await res.json()
-      setRounds(json.rounds || [])
-      setParticipants(json.participants || [])
-      setLoading(false)
+        const json = await res.json()
+        setRounds(json.rounds || [])
+        setParticipants(json.participants || [])
+        setLoading(false)
+      } catch (err) {
+        console.error('[stats] load error:', err)
+        setError('Erreur inattendue — voir la console')
+        setLoading(false)
+      }
     }
     load()
   }, [code, router])
 
   if (loading) return <Loading />
 
-  // Construire les données du graphique
+  // Build chart data
   const chartData: ChartPoint[] = rounds.map(r => {
     const point: ChartPoint = { tour: r.round }
     for (const p of participants) {
@@ -105,7 +123,6 @@ export default function StatsPage() {
     return point
   })
 
-  // Ajouter le point de départ à 0
   if (chartData.length > 0) {
     const zero: ChartPoint = { tour: 0 }
     for (const p of participants) zero[p.display_name] = 0
@@ -114,7 +131,6 @@ export default function StatsPage() {
 
   const hasData = rounds.length > 0
 
-  // Classement final (dernier tour)
   const lastRound = rounds[rounds.length - 1]?.round ?? 0
   const finalRanking = [...participants]
     .map(p => {
@@ -161,47 +177,65 @@ export default function StatsPage() {
         </div>
       ) : (
         <>
-          {/* Graphique */}
+          {/* Graphique — rendu uniquement côté client (recharts utilise DOM/ResizeObserver) */}
           <div className="card p-4 mb-5">
             <h2 className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-4">
               Points cumulés — {POS_LABELS[posFilter]}
             </h2>
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={chartData} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                <XAxis
-                  dataKey="tour"
-                  tickLine={false}
-                  axisLine={false}
-                  tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 11 }}
-                  tickFormatter={v => v === 0 ? '' : `T${v}`}
-                />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 11 }}
-                  tickFormatter={v => v.toFixed(0)}
-                />
-                <Tooltip content={<CustomTooltip myId={myId} participants={participants} posFilter={posFilter} rounds={rounds} />} />
-                <Legend
-                  formatter={(value) => (
-                    <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>{value}</span>
-                  )}
-                />
-                {participants.map((p, i) => (
-                  <Line
-                    key={p.id}
-                    type="monotone"
-                    dataKey={p.display_name}
-                    stroke={LINE_COLORS[i % LINE_COLORS.length]}
-                    strokeWidth={p.id === myId ? 2.5 : 1.5}
-                    dot={false}
-                    activeDot={{ r: 4 }}
-                    strokeOpacity={p.id === myId ? 1 : 0.7}
+            {mounted ? (
+              <ResponsiveContainer width="100%" height={280}>
+                <LineChart data={chartData} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                  <XAxis
+                    dataKey="tour"
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 11 }}
+                    tickFormatter={(v: number) => v === 0 ? '' : `T${v}`}
                   />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 11 }}
+                    tickFormatter={(v: number) => String(Math.round(v))}
+                  />
+                  <Tooltip
+                    content={({ active, payload, label }) => (
+                      <CustomTooltip
+                        active={active}
+                        payload={payload as unknown as TooltipEntry[] | undefined}
+                        label={label as number | undefined}
+                        myId={myId}
+                        participants={participants}
+                        posFilter={posFilter}
+                        rounds={rounds}
+                      />
+                    )}
+                  />
+                  <Legend
+                    formatter={(value: string) => (
+                      <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>{value}</span>
+                    )}
+                  />
+                  {participants.map((p, i) => (
+                    <Line
+                      key={p.id}
+                      type="monotone"
+                      dataKey={p.display_name}
+                      stroke={LINE_COLORS[i % LINE_COLORS.length]}
+                      strokeWidth={p.id === myId ? 2.5 : 1.5}
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                      strokeOpacity={p.id === myId ? 1 : 0.7}
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ height: 280 }} className="flex items-center justify-center text-white/20 text-sm">
+                Chargement du graphique…
+              </div>
+            )}
           </div>
 
           {/* Classement final */}
@@ -239,34 +273,41 @@ export default function StatsPage() {
   )
 }
 
+interface TooltipEntry {
+  name: string
+  value: number
+  color: string
+}
+
 function CustomTooltip({
   active, payload, label,
   myId, participants, posFilter, rounds,
 }: {
   active?: boolean
-  payload?: { name: string; value: number; color: string }[]
+  payload?: TooltipEntry[]
   label?: number
   myId: string | null
   participants: ParticipantData[]
   posFilter: PosFilter
   rounds: RoundInfo[]
 }) {
-  if (!active || !payload?.length || label === 0) return null
+  if (!active || !payload?.length || label === 0 || label === undefined) return null
 
   const round = rounds.find(r => r.round === label)
   const date = round
     ? new Date(round.date + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
     : ''
 
-  // Points de ce tour (non cumulés) par participant
-  const prevRound = label ? label - 1 : 0
-  const tourPoints = payload.map(entry => {
-    const p = participants.find(x => x.display_name === entry.name)
-    if (!p) return { ...entry, tourPts: 0 }
-    const curr = p.cumulative.find(c => c.round === label)?.[posFilter] ?? 0
-    const prev = prevRound > 0 ? (p.cumulative.find(c => c.round === prevRound)?.[posFilter] ?? 0) : 0
-    return { ...entry, tourPts: Math.round((curr - prev) * 10) / 10 }
-  }).sort((a, b) => b.value - a.value)
+  const prevRound = label - 1
+  const tourPoints = payload
+    .map(entry => {
+      const p = participants.find(x => x.display_name === entry.name)
+      if (!p) return { ...entry, tourPts: 0 }
+      const curr = p.cumulative.find(c => c.round === label)?.[posFilter] ?? 0
+      const prev = prevRound > 0 ? (p.cumulative.find(c => c.round === prevRound)?.[posFilter] ?? 0) : 0
+      return { ...entry, tourPts: Math.round((curr - prev) * 10) / 10 }
+    })
+    .sort((a, b) => b.value - a.value)
 
   return (
     <div className="bg-gray-900 border border-white/10 rounded-lg p-3 shadow-xl text-xs">
@@ -277,7 +318,7 @@ function CustomTooltip({
           <div key={entry.name} className="flex items-center gap-2 mb-1 last:mb-0">
             <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: entry.color }} />
             <span className={`flex-1 ${isMe ? 'font-semibold text-white' : 'text-white/70'}`}>{entry.name}</span>
-            <span className="font-bold text-white ml-3">{entry.value.toFixed(1)}</span>
+            <span className="font-bold text-white ml-3">{(entry.value as number).toFixed(1)}</span>
             <span className="text-white/30">(+{entry.tourPts.toFixed(1)})</span>
           </div>
         )
