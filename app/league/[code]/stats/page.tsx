@@ -114,28 +114,33 @@ export default function StatsPage() {
   if (loading) return <Loading />
 
   // Build chart data
-  const chartData: ChartPoint[] = rounds.map(r => {
+  const safeRounds = rounds ?? []
+  const safeParticipants = participants ?? []
+
+  const chartData: ChartPoint[] = safeRounds.map(r => {
     const point: ChartPoint = { tour: r.round }
-    for (const p of participants) {
-      const entry = p.cumulative.find(c => c.round === r.round)
-      point[p.display_name] = entry ? entry[posFilter] : 0
+    for (const p of safeParticipants) {
+      const cum = p.cumulative ?? []
+      const entry = cum.find(c => c.round === r.round)
+      point[p.display_name] = entry ? (entry[posFilter] ?? 0) : 0
     }
     return point
   })
 
   if (chartData.length > 0) {
     const zero: ChartPoint = { tour: 0 }
-    for (const p of participants) zero[p.display_name] = 0
+    for (const p of safeParticipants) zero[p.display_name] = 0
     chartData.unshift(zero)
   }
 
-  const hasData = rounds.length > 0
+  const hasData = safeRounds.length > 0
 
-  const lastRound = rounds[rounds.length - 1]?.round ?? 0
-  const finalRanking = [...participants]
+  const lastRound = safeRounds[safeRounds.length - 1]?.round ?? 0
+  const finalRanking = [...safeParticipants]
     .map(p => {
-      const last = p.cumulative.find(c => c.round === lastRound)
-      return { id: p.id, display_name: p.display_name, pts: last ? last[posFilter] : 0 }
+      const cum = p.cumulative ?? []
+      const last = cum.find(c => c.round === lastRound)
+      return { id: p.id, display_name: p.display_name, pts: last ? (last[posFilter] ?? 0) : 0 }
     })
     .sort((a, b) => b.pts - a.pts)
 
@@ -247,7 +252,8 @@ export default function StatsPage() {
             </div>
             {finalRanking.map((p, i) => {
               const isMe = p.id === myId
-              const color = LINE_COLORS[participants.findIndex(x => x.id === p.id) % LINE_COLORS.length]
+              const idx = safeParticipants.findIndex(x => x.id === p.id)
+              const color = LINE_COLORS[(idx >= 0 ? idx : 0) % LINE_COLORS.length]
               return (
                 <div
                   key={p.id}
@@ -293,32 +299,38 @@ function CustomTooltip({
 }) {
   if (!active || !payload?.length || label === 0 || label === undefined) return null
 
-  const round = rounds.find(r => r.round === label)
+  const safeRounds = rounds ?? []
+  const safeParticipants = participants ?? []
+  const safePayload = payload ?? []
+
+  const round = safeRounds.find(r => r.round === label)
   const date = round
     ? new Date(round.date + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
     : ''
 
   const prevRound = label - 1
-  const tourPoints = payload
+  const tourPoints = safePayload
     .map(entry => {
-      const p = participants.find(x => x.display_name === entry.name)
+      const p = safeParticipants.find(x => x.display_name === entry.name)
       if (!p) return { ...entry, tourPts: 0 }
-      const curr = p.cumulative.find(c => c.round === label)?.[posFilter] ?? 0
-      const prev = prevRound > 0 ? (p.cumulative.find(c => c.round === prevRound)?.[posFilter] ?? 0) : 0
+      const cum = p.cumulative ?? []
+      const curr = cum.find(c => c.round === label)?.[posFilter] ?? 0
+      const prev = prevRound > 0 ? (cum.find(c => c.round === prevRound)?.[posFilter] ?? 0) : 0
       return { ...entry, tourPts: Math.round((curr - prev) * 10) / 10 }
     })
-    .sort((a, b) => b.value - a.value)
+    .sort((a, b) => (b.value ?? 0) - (a.value ?? 0))
 
   return (
     <div className="bg-gray-900 border border-white/10 rounded-lg p-3 shadow-xl text-xs">
       <p className="text-white/50 mb-2 font-medium">Tour {label}{date ? ` · ${date}` : ''}</p>
       {tourPoints.map(entry => {
-        const isMe = participants.find(x => x.display_name === entry.name)?.id === myId
+        const isMe = safeParticipants.find(x => x.display_name === entry.name)?.id === myId
+        const val = typeof entry.value === 'number' ? entry.value : 0
         return (
           <div key={entry.name} className="flex items-center gap-2 mb-1 last:mb-0">
             <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: entry.color }} />
             <span className={`flex-1 ${isMe ? 'font-semibold text-white' : 'text-white/70'}`}>{entry.name}</span>
-            <span className="font-bold text-white ml-3">{(entry.value as number).toFixed(1)}</span>
+            <span className="font-bold text-white ml-3">{val.toFixed(1)}</span>
             <span className="text-white/30">(+{entry.tourPts.toFixed(1)})</span>
           </div>
         )
