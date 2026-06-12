@@ -75,7 +75,30 @@ function buildMatcher(players: DbPlayer[]) {
       return sameTeam ?? candidates[0]
     }
 
+    // Level 3 : initiale prénom ("Gutierrez B." → "Brian Gutiérrez")
     const normParts = norm.split(/\s+/)
+    let initial: string | null = null
+    let lnPart:  string | null = null
+    for (const part of normParts) {
+      const s = part.replace('.', '')
+      if (s.length === 1) initial = s
+      else if (!lnPart)   lnPart  = s
+    }
+    if (initial && lnPart) {
+      const byInitial: DbPlayer[] = []
+      for (const [dbNorm, player] of Array.from(byExact)) {
+        const dbParts = dbNorm.split(/\s+/)
+        if (dbNorm.includes(lnPart) && dbParts.some(p => p.startsWith(initial!)))
+          byInitial.push(player)
+      }
+      if (byInitial.length === 1) return byInitial[0]
+      if (byInitial.length > 1) {
+        const sameTeam = byInitial.find(p => normalize(p.team) === normalize(frTeam))
+        return sameTeam ?? byInitial[0]
+      }
+    }
+
+    // Level 4 : substring sur les parties du nom
     for (const [dbNorm, player] of Array.from(byExact)) {
       const dbParts = dbNorm.split(/\s+/)
       if (normParts.every(part => dbNorm.includes(part))) return player
