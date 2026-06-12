@@ -8,8 +8,9 @@
  *   4. Vérifier la liste affichée en console AVANT d'envoyer
  *
  * Attribution home/away :
- *   Flashscore sépare les compos dans deux conteneurs .lf--1 (dom.) et .lf--2 (ext.).
- *   On extrait les joueurs de chaque conteneur indépendamment — aucune coordonnée X.
+ *   On cible les listes textuelles de compos (pas le terrain graphique dont les X
+ *   reflètent les positions tactiques, pas les équipes).
+ *   Priorité : lf__lineup--home/away → lf--1/lf--2 → lf-- DOM order → X-split
  */
 (function () {
 
@@ -42,17 +43,33 @@
 
   console.log('[FS] ' + home + ' (dom.) vs ' + away + ' (ext.) — ' + date);
 
-  // ── 2. Conteneurs home/away ───────────────────────────────────────────────────
-  // Flashscore sépare les deux colonnes de compos dans .lf--1 (dom.) et .lf--2 (ext.)
+  // ── 2. Conteneurs home/away (listes textuelles uniquement) ───────────────────
   function findContainers() {
-    // Tentative 1 : classes exactes .lf--1 / .lf--2
+    // Priorité 1 : listes textuelles avec home/away explicite dans la classe
+    var pairs = [
+      ['[class*="lf__lineup--home"]',  '[class*="lf__lineup--away"]'],
+      ['[class*="lineup--home"]',       '[class*="lineup--away"]'],
+      ['[class*="lf--home"]',           '[class*="lf--away"]'],
+      ['[class*="lf-side--home"]',      '[class*="lf-side--away"]'],
+    ];
+    for (var p = 0; p < pairs.length; p++) {
+      var h = document.querySelector(pairs[p][0]);
+      var a = document.querySelector(pairs[p][1]);
+      if (h && a) {
+        console.log('[FS] Conteneurs via ' + pairs[p][0].replace(/\[class\*="/g, '.').replace(/"\]/g, ''));
+        return [h, a];
+      }
+    }
+
+    // Priorité 2 : classes .lf--1 / .lf--2 (colonnes, hors terrain graphique si possible)
     var c1 = document.querySelector('.lf--1');
     var c2 = document.querySelector('.lf--2');
     if (c1 && c2) {
-      console.log('[FS] Conteneurs via .lf--1 / .lf--2');
+      console.log('[FS] Conteneurs via .lf--1/.lf--2');
       return [c1, c2];
     }
-    // Tentative 2 : [class*="lf--"] — 2 premiers conteneurs non imbriqués
+
+    // Priorité 3 : [class*="lf--"] — 2 premiers non imbriqués dans l'ordre DOM
     var all = Array.prototype.slice.call(document.querySelectorAll('[class*="lf--"]'));
     var top = [];
     for (var i = 0; i < all.length; i++) {
@@ -63,10 +80,11 @@
       if (ok) { top.push(all[i]); if (top.length === 2) break; }
     }
     if (top.length === 2) {
-      console.log('[FS] Conteneurs via [class*="lf--"] (fallback)');
+      console.log('[FS] Conteneurs via [class*="lf--"] (ordre DOM)');
       return top;
     }
-    console.warn('[FS] Aucun conteneur lf-- trouvé — fallback X-split');
+
+    console.warn('[FS] Aucun conteneur trouvé — fallback X-split');
     return null;
   }
 

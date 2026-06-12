@@ -23,6 +23,8 @@ const SCRIPT_FLASHSCORE = `(function () {
   console.log('[FS] ' + home + ' (dom.) vs ' + away + ' (ext.) — ' + date);
 
   function findContainers() {
+    var pairs = [['[class*="lf__lineup--home"]','[class*="lf__lineup--away"]'],['[class*="lineup--home"]','[class*="lineup--away"]'],['[class*="lf--home"]','[class*="lf--away"]'],['[class*="lf-side--home"]','[class*="lf-side--away"]']];
+    for (var p = 0; p < pairs.length; p++) { var h = document.querySelector(pairs[p][0]); var a = document.querySelector(pairs[p][1]); if (h && a) { console.log('[FS] Conteneurs via ' + pairs[p][0]); return [h, a]; } }
     var c1 = document.querySelector('.lf--1'); var c2 = document.querySelector('.lf--2');
     if (c1 && c2) { console.log('[FS] Conteneurs .lf--1/.lf--2'); return [c1, c2]; }
     var all = Array.prototype.slice.call(document.querySelectorAll('[class*="lf--"]'));
@@ -32,8 +34,8 @@ const SCRIPT_FLASHSCORE = `(function () {
       for (var j = 0; j < top.length; j++) { if (top[j].contains(all[i]) || all[i].contains(top[j])) { ok = false; break; } }
       if (ok) { top.push(all[i]); if (top.length === 2) break; }
     }
-    if (top.length === 2) { console.log('[FS] Conteneurs via [class*="lf--"]'); return top; }
-    console.warn('[FS] Aucun conteneur lf-- — fallback X-split'); return null;
+    if (top.length === 2) { console.log('[FS] Conteneurs via [class*="lf--"] (ordre DOM)'); return top; }
+    console.warn('[FS] Aucun conteneur — fallback X-split'); return null;
   }
 
   var containers = findContainers();
