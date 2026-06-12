@@ -176,10 +176,16 @@ export async function POST(req: NextRequest) {
   let imported = 0
   const unmatched: string[] = []
 
+  console.log('[import] matchs en base:', JSON.stringify(
+    (dbMatches ?? []).map((m: unknown) => { const x = m as DbMatch; return { id: x.id, home: x.home_team, away: x.away_team } })
+  ))
+
   for (const m of matches) {
     const sofascoreMatchId = String(m.sofaId)
     const frHome = TEAM_MAP[m.home] ?? m.home
     const frAway = TEAM_MAP[m.away] ?? m.away
+    console.log('[import] home mappé:', frHome, 'away mappé:', frAway)
+
     const matchDate = m.startTimestamp
       ? new Date(m.startTimestamp * 1000).toISOString()
       : date
@@ -191,9 +197,12 @@ export async function POST(req: NextRequest) {
     if (!match) {
       // 2. Par home_team + away_team (normalisé — ignore accents et casse)
       const teamsKey = `${normalize(frHome)}|${normalize(frAway)}`
+      console.log('[import] teamsKey cherché:', teamsKey, '| clés en base:', JSON.stringify([...matchByTeams.keys()]))
       match = matchByTeams.get(teamsKey) ?? null
       if (match) foundByTeams = true
     }
+
+    console.log('[import] match trouvé:', match?.id ?? 'null')
 
     if (!match) {
       // 3. Créer le match avec l'ID numérique SofaScore
