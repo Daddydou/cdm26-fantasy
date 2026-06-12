@@ -84,6 +84,9 @@
       }
     }
     if (!name) return;
+    // Supprimer le numéro de maillot en début de nom ("15Reyes" → "Reyes")
+    name = name.replace(/^\d+/, '').trim();
+    if (!name) return;
 
     // Minutes jouées (remplaçants sortis)
     var subMin  = 90;

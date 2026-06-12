@@ -44,6 +44,7 @@ const SCRIPT_FLASHSCORE = `(function () {
     for (var li = 0; li < links.length; li++) { var lt = (links[li].textContent || '').trim(); if (isValidName(lt)) { name = lt; break; } }
     if (!name) { var named = el.querySelectorAll('[class*="Name"], [class*="name"]'); for (var ni = 0; ni < named.length; ni++) { var nt = (named[ni].textContent || '').trim(); if (isValidName(nt) && named[ni].querySelectorAll('*').length < 4) { name = nt; break; } } }
     if (!name) return;
+    name = name.replace(/^\\d+/, '').trim(); if (!name) return;
     var subMin = 90; var allDesc = el.querySelectorAll('*');
     for (var di = 0; di < allDesc.length; di++) { var mt = (allDesc[di].textContent || '').trim(); if (MINUTE_RE.test(mt)) { subMin = 90 - parseInt(MINUTE_RE.exec(mt)[1], 10); break; } }
     var key = name.toLowerCase().replace(/\\s+/g, ' ').trim(); if (seenKeys[key]) return; seenKeys[key] = true;
