@@ -7,11 +7,12 @@ import { supabase } from '@/lib/supabase'
 type Prediction = {
   participant_id: string
   display_name: string
-  current_points: number
-  estimated_future: number
-  projected_total: number
+  score: number
+  win_pct: number
   player_count: number
-  total_remaining_matches: number
+  avg_note: number
+  avg_tm_value: number
+  avg_force_norm: number
 }
 
 export default function PredictionsPage() {
@@ -53,23 +54,10 @@ export default function PredictionsPage() {
 
   if (loading) return <Loading />
 
-  const leader = predictions[0] ?? null
-  const me = predictions.find(p => p.participant_id === myId) ?? null
-  const myAvgRemaining = me && me.player_count > 0
-    ? (me.total_remaining_matches / me.player_count).toFixed(1)
-    : null
+  const maxPct  = predictions[0]?.win_pct ?? 0
 
-  // Calcul des % de chances de gagner
-  const totalProjected = predictions.reduce((s, p) => s + p.projected_total, 0)
-  const allEqual = predictions.every(p => p.projected_total === predictions[0]?.projected_total)
-  const equalPct = predictions.length > 0 ? Math.round((100 / predictions.length) * 10) / 10 : 0
-
-  const winPct = (projected: number): number => {
-    if (predictions.length === 0) return 0
-    if (allEqual || totalProjected === 0) return equalPct
-    return Math.round((projected / totalProjected) * 1000) / 10
-  }
-
+  const rankColor = (i: number) =>
+    i === 0 ? 'text-yellow-400' : i === 1 ? 'text-gray-300' : i === 2 ? 'text-amber-600' : 'text-white/30'
   const barColor = (i: number) =>
     i === 0 ? 'bg-yellow-400' : i === 1 ? 'bg-gray-300' : i === 2 ? 'bg-amber-600' : 'bg-white/20'
 
@@ -79,17 +67,9 @@ export default function PredictionsPage() {
         <button onClick={() => router.push(`/league/${code}`)} className="text-white/40 hover:text-white">←</button>
         <div>
           <h1 className="text-lg font-bold text-white">Prédictions</h1>
-          <p className="text-xs text-white/40">Projection de fin de tournoi</p>
+          <p className="text-xs text-white/40">Score composite : notes · valeur · cote équipe</p>
         </div>
       </div>
-
-      {myAvgRemaining && (
-        <div className="card p-3 mb-4 border-brand-500/20 bg-brand-500/5">
-          <p className="text-xs text-brand-400 text-center">
-            Projection basée sur ~{myAvgRemaining} matchs restants par joueur
-          </p>
-        </div>
-      )}
 
       {error && (
         <div className="card p-3 mb-4 border-red-500/20 bg-red-500/5">
@@ -107,41 +87,34 @@ export default function PredictionsPage() {
         <div className="space-y-2">
           {predictions.map((p, i) => {
             const isMe = p.participant_id === myId
-            const gap = leader ? p.projected_total - leader.projected_total : 0
-            const avgRemaining = p.player_count > 0
-              ? (p.total_remaining_matches / p.player_count).toFixed(1)
-              : '0'
-            const pct = winPct(p.projected_total)
-            const maxPct = winPct(predictions[0]?.projected_total ?? 0)
 
             return (
               <div key={p.participant_id} className={`card p-4 ${isMe ? 'border-brand-500/30 bg-brand-500/5' : ''}`}>
+                {/* Ligne principale */}
                 <div className="flex items-center gap-3 mb-2">
-                  <span className={`w-6 text-center text-sm font-bold flex-shrink-0 ${
-                    i === 0 ? 'text-yellow-400' : i === 1 ? 'text-gray-300' : i === 2 ? 'text-amber-600' : 'text-white/30'
-                  }`}>
+                  <span className={`w-6 text-center text-sm font-bold flex-shrink-0 ${rankColor(i)}`}>
                     {i + 1}
                   </span>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-white truncate">{p.display_name}</span>
                       {isMe && <span className="text-xs text-brand-400 font-medium">(toi)</span>}
                     </div>
-                    <p className="text-xs text-white/40 mt-0.5">
-                      {p.current_points.toFixed(1)} actuels
-                      {' + '}
-                      <span className="text-green-400">{p.estimated_future.toFixed(1)} estimés</span>
-                      <span className="text-white/20"> · ~{avgRemaining} matchs/joueur</span>
+                    <p className="text-xs text-white/30 mt-0.5">
+                      Note moy : <span className="text-white/60">{p.avg_note.toFixed(1)}</span>
+                      {' · '}
+                      Valeur moy : <span className="text-white/60">{p.avg_tm_value.toFixed(1)}M</span>
+                      {' · '}
+                      Force : <span className="text-white/60">{p.avg_force_norm.toFixed(1)}/10</span>
                     </p>
                   </div>
 
-                  <div className="text-right flex-shrink-0 min-w-[70px]">
-                    <p className={`text-lg font-bold ${i === 0 ? 'text-yellow-400' : 'text-white'}`}>
-                      {pct.toFixed(1)}%
+                  <div className="text-right flex-shrink-0 min-w-[64px]">
+                    <p className={`text-xl font-bold ${i === 0 ? 'text-yellow-400' : 'text-white'}`}>
+                      {p.win_pct.toFixed(1)}%
                     </p>
-                    <p className="text-xs text-white/30">{p.projected_total.toFixed(1)} pts</p>
-                    {i > 0 && <p className="text-xs text-red-400">{gap.toFixed(1)}</p>}
+                    <p className="text-xs text-white/30">{p.player_count} joueurs</p>
                   </div>
                 </div>
 
@@ -149,7 +122,7 @@ export default function PredictionsPage() {
                 <div className="ml-9 bg-white/5 rounded-full h-1.5">
                   <div
                     className={`h-1.5 rounded-full transition-all ${barColor(i)}`}
-                    style={{ width: `${maxPct > 0 ? (pct / maxPct) * 100 : 0}%` }}
+                    style={{ width: `${maxPct > 0 ? (p.win_pct / maxPct) * 100 : 0}%` }}
                   />
                 </div>
               </div>
@@ -159,7 +132,7 @@ export default function PredictionsPage() {
       )}
 
       <p className="text-center text-xs text-white/20 mt-6">
-        * Note moyenne actuelle × matchs restants. Joueurs sans note : 6.5 par défaut.
+        Score = note (40%) + valeur TM (30%) + cote équipe (30%). Note par défaut si 0 match : 6.5.
       </p>
     </main>
   )
