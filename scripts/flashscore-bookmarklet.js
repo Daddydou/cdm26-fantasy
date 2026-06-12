@@ -64,15 +64,12 @@
     return m ? (90 - parseInt(m[1], 10)) : 90;
   }
 
-  // Stratégie 1 : conteneurs .lf--1 (home) et .lf--2 (away)
-  function scanSide(containerSel, teamName) {
-    var container = document.querySelector(containerSel);
-    if (!container) return false;
+  // Scan un élément conteneur de lineup et ajoute tous ses joueurs notés
+  function scanContainer(container, teamName) {
+    if (!container) return;
     var playerEls = container.querySelectorAll(
       '[class*="lf__player"], [class*="lineup__player"], [class*="wl__player"]'
     );
-    if (!playerEls.length) return false;
-
     playerEls.forEach(function (playerEl) {
       var nameEl = playerEl.querySelector(
         '[class*="playerName"], [class*="player__name"], [class*="wl__name"]'
@@ -80,25 +77,57 @@
       var name       = nameEl ? nameEl.textContent.trim() : null;
       var ratingStr  = null;
       var subMinutes = 90;
-
       var desc = playerEl.querySelectorAll('*');
       for (var i = 0; i < desc.length; i++) {
         var txt = (desc[i].textContent || '').trim();
         if (ratingRe.test(txt)) ratingStr  = txt;
         if (minuteRe.test(txt)) subMinutes = parseSubMinutes(txt);
       }
-
       if (name && ratingStr) addPlayer(name, teamName, ratingStr, subMinutes);
     });
-    return players.length > 0;
   }
 
-  scanSide('.lf--1', home);
-  scanSide('.lf--2', away);
+  // Stratégie 1 : conteneurs .lf--1 et .lf--2
+  // IMPORTANT : on ne suppose PAS que lf--1 = home — on trie par position X.
+  // Flashscore affiche toujours l'équipe domicile à GAUCHE.
+  var col1 = document.querySelector('.lf--1');
+  var col2 = document.querySelector('.lf--2');
+
+  if (col1 && col2) {
+    var x1   = col1.getBoundingClientRect().left;
+    var x2   = col2.getBoundingClientRect().left;
+    var homeCol = x1 <= x2 ? col1 : col2;
+    var awayCol = x1 <= x2 ? col2 : col1;
+    scanContainer(homeCol, home);
+    scanContainer(awayCol, away);
+  } else {
+    // Fallback : cherche n'importe quel conteneur lf-- avec des joueurs
+    var allCols = Array.prototype.slice.call(
+      document.querySelectorAll('[class*="lf--"]')
+    ).filter(function (c) {
+      return c.querySelectorAll('[class*="lf__player"]').length > 0;
+    });
+    if (allCols.length >= 2) {
+      allCols.sort(function (a, b) {
+        return a.getBoundingClientRect().left - b.getBoundingClientRect().left;
+      });
+      scanContainer(allCols[0], home);
+      scanContainer(allCols[1], away);
+    }
+  }
 
   // Stratégie 2 : TreeWalker générique si stratégie 1 a échoué
   if (!players.length) {
-    var midX   = document.documentElement.scrollWidth / 2;
+    // Calcul du milieu depuis les headers des deux participants
+    var homeHdr = document.querySelector('.duelParticipant__home');
+    var awayHdr = document.querySelector('.duelParticipant__away');
+    var midX;
+    if (homeHdr && awayHdr) {
+      midX = (homeHdr.getBoundingClientRect().right + awayHdr.getBoundingClientRect().left) / 2;
+    } else {
+      midX = document.documentElement.clientWidth / 2;
+    }
+
     var walker = document.createTreeWalker(document.body, 1 /* SHOW_ELEMENT */, null, false);
     var el;
     while ((el = walker.nextNode())) {
@@ -156,10 +185,14 @@
 
   function fmtResult(label, r) {
     if (r.ok) {
-      var s = '✅ ' + label + ' : ' + (r.data.imported || 0) + ' notes';
-      if (r.data.unmatched && r.data.unmatched.length)
-        s += '\n  ⚠ Non matchés (' + r.data.unmatched.length + ') : ' +
-             r.data.unmatched.slice(0, 5).join(', ');
+      if (r.data && r.data.error_type === 'sofascore_blocked') {
+        return '⚠ ' + label + ' : SofaScore bloqué côté serveur';
+      }
+      var count = (r.data && (r.data.imported || r.data.matched)) || 0;
+      var s = '✅ ' + label + ' : ' + count + ' notes';
+      var nm = r.data && r.data.unmatched;
+      if (nm && nm.length)
+        s += '\n  ⚠ Non matchés (' + nm.length + ') : ' + nm.slice(0, 5).join(', ');
       return s;
     }
     return '❌ ' + label + ' : HTTP ' + (r.status || '?') + ' ' +

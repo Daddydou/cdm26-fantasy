@@ -49,11 +49,9 @@ const SCRIPT_FLASHSCORE = `(function () {
 
   function parseSubMinutes(txt) { var m = minuteRe.exec(txt); return m ? (90 - parseInt(m[1], 10)) : 90; }
 
-  function scanSide(containerSel, teamName) {
-    var container = document.querySelector(containerSel);
-    if (!container) return false;
+  function scanContainer(container, teamName) {
+    if (!container) return;
     var playerEls = container.querySelectorAll('[class*="lf__player"],[class*="lineup__player"],[class*="wl__player"]');
-    if (!playerEls.length) return false;
     playerEls.forEach(function (playerEl) {
       var nameEl = playerEl.querySelector('[class*="playerName"],[class*="player__name"],[class*="wl__name"]');
       var name = nameEl ? nameEl.textContent.trim() : null;
@@ -66,14 +64,32 @@ const SCRIPT_FLASHSCORE = `(function () {
       }
       if (name && ratingStr) addPlayer(name, teamName, ratingStr, subMinutes);
     });
-    return players.length > 0;
   }
 
-  scanSide('.lf--1', home);
-  scanSide('.lf--2', away);
+  // Stratégie 1 : trier .lf--1/.lf--2 par position X (gauche = domicile)
+  var col1 = document.querySelector('.lf--1');
+  var col2 = document.querySelector('.lf--2');
+  if (col1 && col2) {
+    var x1 = col1.getBoundingClientRect().left;
+    var x2 = col2.getBoundingClientRect().left;
+    scanContainer(x1 <= x2 ? col1 : col2, home);
+    scanContainer(x1 <= x2 ? col2 : col1, away);
+  } else {
+    var allCols = Array.prototype.slice.call(document.querySelectorAll('[class*="lf--"]'))
+      .filter(function (c) { return c.querySelectorAll('[class*="lf__player"]').length > 0; });
+    if (allCols.length >= 2) {
+      allCols.sort(function (a, b) { return a.getBoundingClientRect().left - b.getBoundingClientRect().left; });
+      scanContainer(allCols[0], home);
+      scanContainer(allCols[1], away);
+    }
+  }
 
   if (!players.length) {
-    var midX = document.documentElement.scrollWidth / 2;
+    var homeHdr = document.querySelector('.duelParticipant__home');
+    var awayHdr = document.querySelector('.duelParticipant__away');
+    var midX = (homeHdr && awayHdr)
+      ? (homeHdr.getBoundingClientRect().right + awayHdr.getBoundingClientRect().left) / 2
+      : document.documentElement.clientWidth / 2;
     var walker = document.createTreeWalker(document.body, 1, null, false);
     var el;
     while ((el = walker.nextNode())) {
@@ -111,9 +127,13 @@ const SCRIPT_FLASHSCORE = `(function () {
   }
   function fmtResult(label, r) {
     if (r.ok) {
-      var s = '✅ ' + label + ' : ' + (r.data.imported || 0) + ' notes';
-      if (r.data.unmatched && r.data.unmatched.length)
-        s += '\\n  ⚠ Non matchés (' + r.data.unmatched.length + ') : ' + r.data.unmatched.slice(0, 5).join(', ');
+      if (r.data && r.data.error_type === 'sofascore_blocked')
+        return '⚠ ' + label + ' : SofaScore bloqué côté serveur';
+      var count = (r.data && (r.data.imported || r.data.matched)) || 0;
+      var s = '✅ ' + label + ' : ' + count + ' notes';
+      var nm = r.data && r.data.unmatched;
+      if (nm && nm.length)
+        s += '\\n  ⚠ Non matchés (' + nm.length + ') : ' + nm.slice(0, 5).join(', ');
       return s;
     }
     return '❌ ' + label + ' : HTTP ' + (r.status || '?') + ' ' + ((r.data && r.data.error) || r.error || '');
