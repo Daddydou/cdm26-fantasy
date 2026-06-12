@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { League, Participant, SquadDetail } from '@/lib/database.types'
+
+type ParticipantSummary = { id: string; display_name: string; budget_remaining: number }
 import { POSITION_LABELS, validateSquad } from '@/lib/pricing'
 
 const POSITIONS = ['GK', 'DEF', 'MID', 'ATT'] as const
@@ -14,7 +16,7 @@ export default function SquadPage() {
   const router = useRouter()
   const [league, setLeague] = useState<League | null>(null)
   const [me, setMe] = useState<Participant | null>(null)
-  const [participants, setParticipants] = useState<Participant[]>([])
+  const [participants, setParticipants] = useState<ParticipantSummary[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [squads, setSquads] = useState<Record<string, SquadDetail[]>>({})
   const [loading, setLoading] = useState(true)
@@ -32,9 +34,15 @@ export default function SquadPage() {
       const { data: p } = await supabase.from('fantasy_participants').select().eq('league_id', lg.id).eq('user_id', user.id).single()
       if (!p) { router.push('/'); return }
       setMe(p)
-      const { data: allP } = await supabase.from('fantasy_participants').select().eq('league_id', lg.id).order('display_name')
-      setParticipants(allP || [])
-      console.log('[squad] draft_open:', lg.draft_open, 'market_open:', lg.market_open, 'participants:', (allP || []).length)
+      // fantasy_standings bypasses RLS on fantasy_participants (which only returns own row)
+      const { data: standings } = await supabase
+        .from('fantasy_standings')
+        .select('participant_id, display_name, budget_remaining')
+        .eq('league_id', lg.id)
+        .order('display_name')
+      const allP = (standings || []).map(s => ({ id: s.participant_id, display_name: s.display_name, budget_remaining: s.budget_remaining }))
+      setParticipants(allP)
+      console.log('[squad] draft_open:', lg.draft_open, 'market_open:', lg.market_open, 'participants:', allP.length)
       const { data: sq } = await supabase.from('fantasy_squad_detail').select().eq('participant_id', p.id).eq('active', true).order('position')
       setSquads({ [p.id]: sq || [] })
       setSelectedId(p.id)
