@@ -151,21 +151,43 @@ export default function HistoryPage() {
       </div>
 
       {marketIsOpen && (
-        <p className="text-xs text-white/30 mb-3">
-          🔒 Les transferts des autres participants sont masqués pendant le draft / les transferts
-        </p>
+        <div className="card p-3 mb-4 border-yellow-500/20 bg-yellow-500/5">
+          <p className="text-xs text-yellow-400 text-center">
+            {league?.draft_open ? 'Draft en cours' : 'Marché ouvert'} — seuls tes transferts sont visibles
+          </p>
+        </div>
+      )}
+
+      {!marketIsOpen && participants.length > 1 && (
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-3" style={{ scrollbarWidth: 'none' }}>
+          <button
+            onClick={() => setParticipantFilter('all')}
+            className={`flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              participantFilter === 'all'
+                ? 'bg-brand-500 text-white'
+                : 'bg-white/5 text-white/60 hover:bg-white/10'
+            }`}
+          >
+            Tous
+          </button>
+          {participants.map(p => (
+            <button
+              key={p.id}
+              onClick={() => setParticipantFilter(p.id)}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                participantFilter === p.id
+                  ? 'bg-brand-500 text-white'
+                  : 'bg-white/5 text-white/60 hover:bg-white/10'
+              }`}
+            >
+              {p.display_name}
+              {p.id === me?.id && <span className="ml-1 text-xs opacity-60">(toi)</span>}
+            </button>
+          ))}
+        </div>
       )}
 
       <div className="space-y-2 mb-2">
-        {!marketIsOpen && (
-          <select value={participantFilter} onChange={e => setParticipantFilter(e.target.value)} className={selectClass}>
-            <option value="all">Tous les participants</option>
-            {me && <option value={me.id}>Moi ({me.display_name})</option>}
-            {participants.filter(p => p.id !== me?.id).map(p => (
-              <option key={p.id} value={p.id}>{p.display_name}</option>
-            ))}
-          </select>
-        )}
         <select value={teamFilter} onChange={e => setTeamFilter(e.target.value)} className={selectClass}>
           <option value="all">Toutes les équipes</option>
           {teams.map(t => <option key={t} value={t}>{t}</option>)}
