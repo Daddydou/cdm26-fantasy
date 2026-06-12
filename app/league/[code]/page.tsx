@@ -114,8 +114,8 @@ export default function LeaguePage() {
           className="card p-4 hover:bg-white/10 transition-all text-center"
         >
           <div className="text-2xl mb-1">👥</div>
-          <p className="text-sm font-medium text-white">Mon équipe</p>
-          <p className="text-xs text-white/40 mt-0.5">Voir mes joueurs</p>
+          <p className="text-sm font-medium text-white">Équipes</p>
+          <p className="text-xs text-white/40 mt-0.5">Voir les équipes</p>
         </Link>
 
         {marketIsOpen ? (
