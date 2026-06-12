@@ -108,14 +108,8 @@
   }
 
   // ── 2a. Titulaires — lf__formation (home) / lf__formationAway (away) ──────────
-  var homeFormation = null;
-  var awayFormation = null;
-  var allFormations = document.querySelectorAll('[class*="lf__formation"]');
-  for (var fi = 0; fi < allFormations.length; fi++) {
-    var cls = allFormations[fi].className;
-    if (cls.indexOf('lf__formationAway') !== -1) { awayFormation = allFormations[fi]; }
-    else if (cls.indexOf('lf__formation') !== -1 && !homeFormation) { homeFormation = allFormations[fi]; }
-  }
+  var homeFormation = document.querySelector('[class*="lf__formation--extended"]');
+  var awayFormation = document.querySelector('[class*="lf__formationAway"]');
 
   if (homeFormation) {
     var homeStarters = homeFormation.querySelectorAll('[class*="lf__player"]');

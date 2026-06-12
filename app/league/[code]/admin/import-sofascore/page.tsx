@@ -50,9 +50,8 @@ const SCRIPT_FLASHSCORE = `(function () {
     players.push({ name: name, team: teamName, rating: rating, goals: 0, assists: 0, minutes: (subMin > 0 && subMin <= 90) ? subMin : 90 });
   }
 
-  var homeFormation = null; var awayFormation = null;
-  var allFormations = document.querySelectorAll('[class*="lf__formation"]');
-  for (var fi = 0; fi < allFormations.length; fi++) { var cls = allFormations[fi].className; if (cls.indexOf('lf__formationAway') !== -1) { awayFormation = allFormations[fi]; } else if (cls.indexOf('lf__formation') !== -1 && !homeFormation) { homeFormation = allFormations[fi]; } }
+  var homeFormation = document.querySelector('[class*="lf__formation--extended"]');
+  var awayFormation = document.querySelector('[class*="lf__formationAway"]');
 
   if (homeFormation) { var hs = homeFormation.querySelectorAll('[class*="lf__player"]'); console.log('[FS] Titulaires home : ' + hs.length); for (var hi = 0; hi < hs.length; hi++) processPlayerEl(hs[hi], home); } else { console.warn('[FS] Pas de formation home'); }
   if (awayFormation) { var as = awayFormation.querySelectorAll('[class*="lf__player"]'); console.log('[FS] Titulaires away : ' + as.length); for (var ai = 0; ai < as.length; ai++) processPlayerEl(as[ai], away); } else { console.warn('[FS] Pas de formation away'); }
