@@ -172,6 +172,15 @@ export default function LeaguePage() {
           <p className="text-sm font-medium text-white">Prédictions</p>
           <p className="text-xs text-white/40 mt-0.5">Projection fin de tournoi</p>
         </Link>
+
+        <Link
+          href={`/league/${code}/stats`}
+          className="card p-4 hover:bg-white/10 transition-all text-center"
+        >
+          <div className="text-2xl mb-1">📊</div>
+          <p className="text-sm font-medium text-white">Stats</p>
+          <p className="text-xs text-white/40 mt-0.5">Évolution des points</p>
+        </Link>
       </div>
 
       {/* Actions compte */}
