@@ -166,15 +166,7 @@
     if (!confirm(msg)) return;
   }
 
-  // ── 4. Test preflight OPTIONS sur CDM26 ──────────────────────────────────────
-  fetch(API_CDM26, { method: 'OPTIONS' })
-    .then(function (r) {
-      console.log('[FS] CDM26 OPTIONS → ' + r.status +
-                  '  ACAO: ' + r.headers.get('Access-Control-Allow-Origin'));
-    })
-    .catch(function (e) { console.warn('[FS] CDM26 OPTIONS échoué :', e.message); });
-
-  // ── 5. Envoi vers les deux APIs en parallèle ──────────────────────────────────
+  // ── 4. Envoi vers les deux APIs en parallèle ─────────────────────────────────
   var cleanPlayers = players.map(function (p) {
     return { name: p.name, team: p.team, rating: p.rating, goals: 0, assists: 0, minutes: p.minutes };
   });
@@ -183,7 +175,10 @@
     date: date,
     matches: [{ sofaId: 0, home: home, away: away, players: cleanPlayers }]
   });
-  var postOpts = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload };
+  // Fantasy : application/json (CORS autorisé)
+  // CDM26   : text/plain pour éviter le preflight OPTIONS (simple request)
+  var postFantasy = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload };
+  var postCdm26   = { method: 'POST', headers: { 'Content-Type': 'text/plain' },       body: payload };
 
   function fetchJson(url, opts) {
     return fetch(url, opts)
@@ -211,7 +206,7 @@
   }
 
   console.log('[FS] Envoi en cours...');
-  Promise.all([fetchJson(API_FANTASY, postOpts), fetchJson(API_CDM26, postOpts)])
+  Promise.all([fetchJson(API_FANTASY, postFantasy), fetchJson(API_CDM26, postCdm26)])
     .then(function (results) {
       alert(home + ' vs ' + away + ' — ' + players.length + ' joueurs\n\n' +
             fmtResult('Fantasy', results[0]) + '\n\n' +

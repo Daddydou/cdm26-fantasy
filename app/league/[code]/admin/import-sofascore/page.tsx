@@ -74,13 +74,10 @@ const SCRIPT_FLASHSCORE = `(function () {
     if (!confirm('⚠ Attribution suspecte : ' + homeP.length + ' × ' + home + ' / ' + awayP.length + ' × ' + away + '.\\nContinuer ?')) return;
   }
 
-  fetch(API_CDM26, { method: 'OPTIONS' })
-    .then(function (r) { console.log('[FS] CDM26 OPTIONS → ' + r.status + '  ACAO: ' + r.headers.get('Access-Control-Allow-Origin')); })
-    .catch(function (e) { console.warn('[FS] CDM26 OPTIONS échoué :', e.message); });
-
   var cleanPlayers = players.map(function (p) { return { name: p.name, team: p.team, rating: p.rating, goals: 0, assists: 0, minutes: p.minutes }; });
-  var payload  = JSON.stringify({ date: date, matches: [{ sofaId: 0, home: home, away: away, players: cleanPlayers }] });
-  var postOpts = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload };
+  var payload     = JSON.stringify({ date: date, matches: [{ sofaId: 0, home: home, away: away, players: cleanPlayers }] });
+  var postFantasy = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload };
+  var postCdm26   = { method: 'POST', headers: { 'Content-Type': 'text/plain' },       body: payload };
 
   function fetchJson(url, opts) {
     return fetch(url, opts).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; }); }).catch(function (e) { return { ok: false, error: String(e) }; });
@@ -96,7 +93,7 @@ const SCRIPT_FLASHSCORE = `(function () {
   }
 
   console.log('[FS] Envoi en cours...');
-  Promise.all([fetchJson(API_FANTASY, postOpts), fetchJson(API_CDM26, postOpts)]).then(function (results) {
+  Promise.all([fetchJson(API_FANTASY, postFantasy), fetchJson(API_CDM26, postCdm26)]).then(function (results) {
     alert(home + ' vs ' + away + ' — ' + players.length + ' joueurs\\n\\n' + fmtResult('Fantasy', results[0]) + '\\n\\n' + fmtResult('CDM26', results[1]));
     console.log('[FS] Fantasy :', results[0]); console.log('[FS] CDM26 :',   results[1]);
   });
