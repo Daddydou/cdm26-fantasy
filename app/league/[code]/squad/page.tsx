@@ -42,7 +42,6 @@ export default function SquadPage() {
         .order('display_name')
       const allP = (standings || []).map(s => ({ id: s.participant_id, display_name: s.display_name, budget_remaining: s.budget_remaining }))
       setParticipants(allP)
-      console.log('[squad] draft_open:', lg.draft_open, 'market_open:', lg.market_open, 'participants:', allP.length)
       const { data: sq } = await supabase.from('fantasy_squad_detail').select().eq('participant_id', p.id).eq('active', true).order('position')
       setSquads({ [p.id]: sq || [] })
       setSelectedId(p.id)
@@ -65,10 +64,11 @@ export default function SquadPage() {
     setSelling(squadDetail.squad_id)
     setError('')
     const phaseMap: Record<string, string> = {
-      post_poule: 'post_poule', huitieme: 'post_poule',
-      post_8: 'post_8', quart: 'post_8',
-      post_quart: 'post_quart', demi: 'post_quart',
-      post_demi: 'post_demi', finale: 'post_demi',
+      draft: 'initial', poule: 'initial',
+      apres_poule: 'post_poule', seizieme: 'post_poule', apres_seizieme: 'post_poule',
+      huitieme: 'post_8', apres_huitieme: 'post_8',
+      quart: 'post_quart', apres_quart: 'post_quart',
+      demi: 'post_demi', apres_demi: 'post_demi', finale: 'post_demi',
     }
     const pricePhase = phaseMap[league.phase] || 'initial'
     const { data: currentPrice } = await supabase.from('fantasy_prices').select('price').eq('player_id', squadDetail.player_id).eq('phase', pricePhase).single()
@@ -94,7 +94,6 @@ export default function SquadPage() {
   if (loading) return <Loading />
 
   const restricted = !!(league?.draft_open || league?.market_open)
-  console.log('[squad] render — restricted:', restricted, 'participants:', participants.length, 'selectedId:', selectedId)
   const squad = selectedId ? (squads[selectedId] ?? []) : []
   const isOwnSquad = selectedId === me?.id
   const selectedParticipant = participants.find(p => p.id === selectedId) ?? me
