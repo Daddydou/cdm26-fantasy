@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { League, Participant } from '@/lib/database.types'
 
+type ParticipantSummary = { id: string; display_name: string }
+
 interface Transfer {
   id: string
   player_name: string
@@ -26,6 +28,7 @@ interface Transfer {
 
 interface SquadRow {
   id: string
+  participant_id: string
   bought_at_price: number
   bought_at_phase: string
   sold_at_price: number | null
@@ -34,7 +37,6 @@ interface SquadRow {
   active: boolean
   created_at: string
   fantasy_players: { id: string; name: string; position: string; team: string; photo_url: string | null } | null
-  fantasy_participants: { id: string; display_name: string } | null
 }
 
 const PHASE_LABELS: Record<string, string> = {
@@ -47,7 +49,7 @@ export default function HistoryPage() {
   const router = useRouter()
   const [league, setLeague] = useState<League | null>(null)
   const [me, setMe] = useState<Participant | null>(null)
-  const [participants, setParticipants] = useState<Participant[]>([])
+  const [participants, setParticipants] = useState<ParticipantSummary[]>([])
   const [transfers, setTransfers] = useState<Transfer[]>([])
   const [loading, setLoading] = useState(true)
   const [participantFilter, setParticipantFilter] = useState<string>('all')
@@ -68,17 +70,22 @@ export default function HistoryPage() {
       if (!p) { router.push('/'); return }
       setMe(p)
 
-      const { data: allParticipants } = await supabase.from('fantasy_participants').select()
-        .eq('league_id', lg.id).order('display_name')
-      setParticipants(allParticipants || [])
+      // fantasy_standings bypasses RLS on fantasy_participants (which only returns own row)
+      const { data: standings } = await supabase
+        .from('fantasy_standings')
+        .select('participant_id, display_name')
+        .eq('league_id', lg.id)
+        .order('display_name')
+      const allP: ParticipantSummary[] = (standings || []).map(s => ({ id: s.participant_id, display_name: s.display_name }))
+      setParticipants(allP)
+      const nameById = new Map(allP.map(s => [s.id, s.display_name]))
 
       const { data: squads } = await supabase
         .from('fantasy_squads')
         .select(`
           id, bought_at_price, bought_at_phase,
-          sold_at_price, sold_at_phase, sold_at, active, created_at,
-          fantasy_players(id, name, position, team, photo_url),
-          fantasy_participants(id, display_name)
+          sold_at_price, sold_at_phase, sold_at, active, created_at, participant_id,
+          fantasy_players(id, name, position, team, photo_url)
         `)
         .eq('league_id', lg.id)
         .order('created_at', { ascending: false })
@@ -90,8 +97,8 @@ export default function HistoryPage() {
         position: s.fantasy_players?.position || '',
         team: s.fantasy_players?.team || '',
         photo_url: s.fantasy_players?.photo_url || null,
-        participant_name: s.fantasy_participants?.display_name || '?',
-        participant_id: s.fantasy_participants?.id || '',
+        participant_name: nameById.get(s.participant_id) || '?',
+        participant_id: s.participant_id,
         bought_at_price: s.bought_at_price,
         bought_at_phase: s.bought_at_phase,
         sold_at_price: s.sold_at_price,
