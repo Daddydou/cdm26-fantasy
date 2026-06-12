@@ -4,7 +4,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Player, Participant, League, PricePhase } from '@/lib/database.types'
-import { POSITION_LABELS, SQUAD_MAX } from '@/lib/pricing'
+import { POSITION_LABELS } from '@/lib/pricing'
+import { getPhaseLimits } from '@/lib/phase-limits'
 
 type PlayerWithPrice = Player & { current_price: number | null }
 const POSITIONS = ['GK', 'DEF', 'MID', 'ATT'] as const
@@ -28,10 +29,10 @@ export default function DraftPage() {
   const currentPricePhase = useCallback((phase: string): PricePhase => {
     const map: Record<string, PricePhase> = {
       draft: 'initial', poule: 'initial',
-      post_poule: 'post_poule', huitieme: 'post_poule',
-      post_8: 'post_8', quart: 'post_8',
-      post_quart: 'post_quart', demi: 'post_quart',
-      post_demi: 'post_demi', finale: 'post_demi',
+      apres_poule: 'post_poule', seizieme: 'post_poule', apres_seizieme: 'post_poule',
+      huitieme: 'post_8', apres_huitieme: 'post_8',
+      quart: 'post_quart', apres_quart: 'post_quart',
+      demi: 'post_demi', apres_demi: 'post_demi', finale: 'post_demi',
     }
     return map[phase] || 'initial'
   }, [])
@@ -154,13 +155,30 @@ export default function DraftPage() {
 
   if (loading) return <Loading />
 
+  const limits = getPhaseLimits(league?.phase ?? 'draft')
   const myCount = myPlayerIds.size
   const mySquadPlayers = players.filter(p => myPlayerIds.has(p.id))
   const myPosCounts = { GK: 0, DEF: 0, MID: 0, ATT: 0 }
   for (const p of mySquadPlayers) {
     if (p.position in myPosCounts) myPosCounts[p.position as keyof typeof myPosCounts]++
   }
-  const squadFull = myCount >= SQUAD_MAX.TOTAL
+  const squadFull = myCount >= limits.total
+
+  // Dépassements de limites (uniquement pendant les transferts)
+  const overLimitWarnings: string[] = []
+  if (league?.market_open) {
+    if (myCount > limits.total)
+      overLimitWarnings.push(`${myCount - limits.total} joueur(s) de trop au total (max ${limits.total})`)
+    if (myPosCounts.GK  > limits.GK)
+      overLimitWarnings.push(`${myPosCounts.GK  - limits.GK}  GK  de trop (max ${limits.GK})`)
+    if (myPosCounts.DEF > limits.DEF)
+      overLimitWarnings.push(`${myPosCounts.DEF - limits.DEF} DEF de trop (max ${limits.DEF})`)
+    if (myPosCounts.MID > limits.MID)
+      overLimitWarnings.push(`${myPosCounts.MID - limits.MID} MID de trop (max ${limits.MID})`)
+    if (myPosCounts.ATT > limits.ATT)
+      overLimitWarnings.push(`${myPosCounts.ATT - limits.ATT} ATT de trop (max ${limits.ATT})`)
+  }
+  const isOverLimit = overLimitWarnings.length > 0
 
   return (
     <main className="min-h-screen p-4 max-w-lg mx-auto overflow-x-hidden">
@@ -175,7 +193,17 @@ export default function DraftPage() {
       </div>
 
       {myCount > 0 && (
-        <SquadValidation count={myCount} posCounts={myPosCounts} squadFull={squadFull} />
+        <SquadValidation count={myCount} posCounts={myPosCounts} limits={limits} squadFull={squadFull} />
+      )}
+
+      {isOverLimit && (
+        <div className="mb-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+          <p className="text-red-400 text-sm font-medium mb-1">Trop de joueurs pour cette phase !</p>
+          {overLimitWarnings.map(w => (
+            <p key={w} className="text-red-400/80 text-xs">⚠ {w}</p>
+          ))}
+          <p className="text-red-400/60 text-xs mt-1">Vends des joueurs avant d&apos;acheter.</p>
+        </div>
       )}
 
       {successMsg && <div className="mb-3 p-3 bg-brand-500/10 border border-brand-500/20 rounded-lg text-brand-400 text-sm">{successMsg}</div>}
@@ -197,9 +225,9 @@ export default function DraftPage() {
         {filtered.map(player => {
           const owned = myPlayerIds.has(player.id)
           const canAfford = (me?.budget_remaining || 0) >= (player.current_price || 0)
-          const posMax = SQUAD_MAX[player.position as keyof typeof SQUAD_MAX] as number
+          const posMax = limits[player.position as keyof typeof limits] as number
           const posAtMax = myPosCounts[player.position as keyof typeof myPosCounts] >= posMax
-          const canBuy = canAfford && !squadFull && !posAtMax && !!player.current_price
+          const canBuy = canAfford && !squadFull && !posAtMax && !isOverLimit && !!player.current_price
           return (
             <div key={player.id} className={`card p-3 flex items-center gap-3 ${owned ? 'border-brand-500/30 bg-brand-500/5' : ''}`}>
               <div className="w-9 h-9 rounded-full bg-white/10 flex-shrink-0 overflow-hidden">
@@ -244,29 +272,31 @@ export default function DraftPage() {
   )
 }
 
-function SquadValidation({ count, posCounts, squadFull }: {
+function SquadValidation({ count, posCounts, limits, squadFull }: {
   count: number
   posCounts: Record<string, number>
+  limits: { total: number; GK: number; DEF: number; MID: number; ATT: number }
   squadFull: boolean
 }) {
-  const posRows: { pos: string; label: string; max: number }[] = [
-    { pos: 'GK',  label: 'GK',  max: SQUAD_MAX.GK },
-    { pos: 'DEF', label: 'DEF', max: SQUAD_MAX.DEF },
-    { pos: 'MID', label: 'MID', max: SQUAD_MAX.MID },
-    { pos: 'ATT', label: 'ATT', max: SQUAD_MAX.ATT },
+  const posRows = [
+    { pos: 'GK',  label: 'GK',  max: limits.GK },
+    { pos: 'DEF', label: 'DEF', max: limits.DEF },
+    { pos: 'MID', label: 'MID', max: limits.MID },
+    { pos: 'ATT', label: 'ATT', max: limits.ATT },
   ]
   return (
     <div className={`card p-3 mb-4 ${squadFull ? 'border-brand-500/30 bg-brand-500/5' : 'border-white/10 bg-white/5'}`}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium text-white">{count}/18 joueurs</span>
+        <span className="text-xs font-medium text-white">{count}/{limits.total} joueurs</span>
         {squadFull && <span className="text-xs text-brand-400 font-medium">Équipe complète</span>}
       </div>
       <div className="flex gap-3">
         {posRows.map(({ pos, label, max }) => {
           const n = posCounts[pos] ?? 0
+          const over = n > max
           const full = n >= max
           return (
-            <span key={pos} className={`text-xs font-mono ${full ? 'text-brand-400' : 'text-white/50'}`}>
+            <span key={pos} className={`text-xs font-mono ${over ? 'text-red-400' : full ? 'text-brand-400' : 'text-white/50'}`}>
               {n}/{max} {label}
             </span>
           )

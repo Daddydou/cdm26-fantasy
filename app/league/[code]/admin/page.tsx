@@ -8,8 +8,9 @@ import { League, Participant } from '@/lib/database.types'
 import { PHASE_LABELS } from '@/lib/pricing'
 
 const PHASE_SEQUENCE = [
-  'draft', 'poule', 'post_poule', 'huitieme', 'post_8',
-  'quart', 'post_quart', 'demi', 'post_demi', 'finale', 'termine'
+  'draft', 'poule', 'apres_poule', 'seizieme', 'apres_seizieme',
+  'huitieme', 'apres_huitieme', 'quart', 'apres_quart',
+  'demi', 'apres_demi', 'finale', 'termine',
 ] as const
 
 export default function AdminPage() {
@@ -71,7 +72,7 @@ export default function AdminPage() {
     const next = PHASE_SEQUENCE[idx + 1]
 
     // Phases de transfert : ouvrir le marché automatiquement
-    const isMarketPhase = ['post_poule', 'post_8', 'post_quart', 'post_demi'].includes(next)
+    const isMarketPhase = ['apres_poule', 'apres_seizieme', 'apres_huitieme', 'apres_quart', 'apres_demi'].includes(next)
     const isDraftPhase = next === 'draft'
 
     await update({

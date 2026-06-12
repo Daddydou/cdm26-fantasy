@@ -47,17 +47,19 @@ export const POSITION_LABELS: Record<string, string> = {
 }
 
 export const PHASE_LABELS: Record<string, string> = {
-  draft:      'Draft initial',
-  poule:      'Phase de poule',
-  post_poule: 'Après poule',
-  huitieme:   '8es de finale',
-  post_8:     'Après 8es',
-  quart:      '1/4 de finale',
-  post_quart: 'Après 1/4',
-  demi:       'Demi-finales',
-  post_demi:  'Après demies',
-  finale:     'Finale',
-  termine:    'Terminé',
+  draft:          'Draft initial',
+  poule:          'Phase de poule',
+  apres_poule:    'Après poule',
+  seizieme:       '1/16e de finale',
+  apres_seizieme: 'Après 1/16e',
+  huitieme:       '8es de finale',
+  apres_huitieme: 'Après 8es',
+  quart:          '1/4 de finale',
+  apres_quart:    'Après 1/4',
+  demi:           'Demi-finales',
+  apres_demi:     'Après demies',
+  finale:         'Finale',
+  termine:        'Terminé',
 }
 
 export const PRICE_PHASES: Record<string, string> = {
