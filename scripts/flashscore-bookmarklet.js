@@ -171,14 +171,19 @@
     return { name: p.name, team: p.team, rating: p.rating, goals: 0, assists: 0, minutes: p.minutes };
   });
 
-  var payload  = JSON.stringify({
+  var payload      = JSON.stringify({
+    date: date,
+    matches: [{ sofaId: 0, home: home, away: away, players: cleanPlayers }]
+  });
+  var payloadCdm26 = JSON.stringify({
+    adminKey: 'CDM2026admin',
     date: date,
     matches: [{ sofaId: 0, home: home, away: away, players: cleanPlayers }]
   });
   // Fantasy : application/json (CORS autorisé)
   // CDM26   : text/plain pour éviter le preflight OPTIONS (simple request)
   var postFantasy = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload };
-  var postCdm26   = { method: 'POST', headers: { 'Content-Type': 'text/plain' },       body: payload };
+  var postCdm26   = { method: 'POST', headers: { 'Content-Type': 'text/plain' },       body: payloadCdm26 };
 
   function fetchJson(url, opts) {
     return fetch(url, opts)

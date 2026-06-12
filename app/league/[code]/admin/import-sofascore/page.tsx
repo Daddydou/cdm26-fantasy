@@ -75,9 +75,10 @@ const SCRIPT_FLASHSCORE = `(function () {
   }
 
   var cleanPlayers = players.map(function (p) { return { name: p.name, team: p.team, rating: p.rating, goals: 0, assists: 0, minutes: p.minutes }; });
-  var payload     = JSON.stringify({ date: date, matches: [{ sofaId: 0, home: home, away: away, players: cleanPlayers }] });
-  var postFantasy = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload };
-  var postCdm26   = { method: 'POST', headers: { 'Content-Type': 'text/plain' },       body: payload };
+  var payload      = JSON.stringify({ date: date, matches: [{ sofaId: 0, home: home, away: away, players: cleanPlayers }] });
+  var payloadCdm26 = JSON.stringify({ adminKey: 'CDM2026admin', date: date, matches: [{ sofaId: 0, home: home, away: away, players: cleanPlayers }] });
+  var postFantasy  = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload };
+  var postCdm26    = { method: 'POST', headers: { 'Content-Type': 'text/plain' },       body: payloadCdm26 };
 
   function fetchJson(url, opts) {
     return fetch(url, opts).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; }); }).catch(function (e) { return { ok: false, error: String(e) }; });
