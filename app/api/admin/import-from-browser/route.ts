@@ -154,21 +154,17 @@ export async function POST(req: NextRequest) {
 
   const [{ data: dbPlayers, error: playersError }, { data: dbMatches }] = await Promise.all([
     supabaseAdmin.from('fantasy_players').select('id, name, team'),
-    supabaseAdmin.from('fantasy_matches').select(),
+    supabaseAdmin.from('fantasy_matches').select('id, sofascore_match_id, home_team, away_team'),
   ])
 
   if (playersError || !dbPlayers) {
     return NextResponse.json({ error: 'Impossible de charger les joueurs' }, { status: 500, headers: c })
   }
 
-  // Index des matches en base pour lookup O(1)
   type DbMatch = { id: string; sofascore_match_id: string; home_team: string; away_team: string; [k: string]: unknown }
-  const matchById  = new Map<string, DbMatch>()
-  const matchByTeams = new Map<string, DbMatch>()
+  const matchById = new Map<string, DbMatch>()
   for (const m of (dbMatches ?? []) as DbMatch[]) {
     matchById.set(m.sofascore_match_id, m)
-    const key = `${normalize(m.home_team)}|${normalize(m.away_team)}`
-    matchByTeams.set(key, m)
   }
 
   const findPlayer = buildMatcher(dbPlayers as DbPlayer[])
@@ -176,15 +172,11 @@ export async function POST(req: NextRequest) {
   let imported = 0
   const unmatched: string[] = []
 
-  console.log('[import] matchs en base:', JSON.stringify(
-    (dbMatches ?? []).map((m: unknown) => { const x = m as DbMatch; return { id: x.id, home: x.home_team, away: x.away_team } })
-  ))
-
   for (const m of matches) {
     const sofascoreMatchId = String(m.sofaId)
     const frHome = TEAM_MAP[m.home] ?? m.home
     const frAway = TEAM_MAP[m.away] ?? m.away
-    console.log('[import] home mappé:', frHome, 'away mappé:', frAway)
+    console.log('[import] cherche match:', frHome, 'vs', frAway)
 
     const matchDate = m.startTimestamp
       ? new Date(m.startTimestamp * 1000).toISOString()
@@ -195,14 +187,19 @@ export async function POST(req: NextRequest) {
     let foundByTeams = false
 
     if (!match) {
-      // 2. Par home_team + away_team (normalisé — ignore accents et casse)
-      const teamsKey = `${normalize(frHome)}|${normalize(frAway)}`
-      console.log('[import] teamsKey cherché:', teamsKey, '| clés en base:', JSON.stringify([...matchByTeams.keys()]))
-      match = matchByTeams.get(teamsKey) ?? null
-      if (match) foundByTeams = true
+      // 2. ILIKE sur home_team + away_team (et ordre inversé)
+      const { data: ilikeMatch } = await supabaseAdmin
+        .from('fantasy_matches')
+        .select()
+        .or(
+          `and(home_team.ilike.%${frHome}%,away_team.ilike.%${frAway}%),` +
+          `and(home_team.ilike.%${frAway}%,away_team.ilike.%${frHome}%)`
+        )
+        .maybeSingle()
+      if (ilikeMatch) { match = ilikeMatch as DbMatch; foundByTeams = true }
     }
 
-    console.log('[import] match trouvé:', match?.id ?? 'null')
+    console.log('[import] match trouvé:', match?.id ?? 'null', match ? `(${match.home_team} vs ${match.away_team})` : '')
 
     if (!match) {
       // 3. Créer le match avec l'ID numérique SofaScore
