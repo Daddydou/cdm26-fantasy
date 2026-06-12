@@ -34,6 +34,7 @@ export default function SquadPage() {
       setMe(p)
       const { data: allP } = await supabase.from('fantasy_participants').select().eq('league_id', lg.id).order('display_name')
       setParticipants(allP || [])
+      console.log('[squad] draft_open:', lg.draft_open, 'market_open:', lg.market_open, 'participants:', (allP || []).length)
       const { data: sq } = await supabase.from('fantasy_squad_detail').select().eq('participant_id', p.id).eq('active', true).order('position')
       setSquads({ [p.id]: sq || [] })
       setSelectedId(p.id)
@@ -85,6 +86,7 @@ export default function SquadPage() {
   if (loading) return <Loading />
 
   const restricted = !!(league?.draft_open || league?.market_open)
+  console.log('[squad] render — restricted:', restricted, 'participants:', participants.length, 'selectedId:', selectedId)
   const squad = selectedId ? (squads[selectedId] ?? []) : []
   const isOwnSquad = selectedId === me?.id
   const selectedParticipant = participants.find(p => p.id === selectedId) ?? me
