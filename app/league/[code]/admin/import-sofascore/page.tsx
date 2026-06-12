@@ -22,23 +22,6 @@ const SCRIPT_FLASHSCORE = `(function () {
   if (!date) return;
   console.log('[FS] ' + home + ' (dom.) vs ' + away + ' (ext.) — ' + date);
 
-  function findContainers() {
-    var pairs = [['[class*="lf__lineup--home"]','[class*="lf__lineup--away"]'],['[class*="lineup--home"]','[class*="lineup--away"]'],['[class*="lf--home"]','[class*="lf--away"]'],['[class*="lf-side--home"]','[class*="lf-side--away"]']];
-    for (var p = 0; p < pairs.length; p++) { var h = document.querySelector(pairs[p][0]); var a = document.querySelector(pairs[p][1]); if (h && a) { console.log('[FS] Conteneurs via ' + pairs[p][0]); return [h, a]; } }
-    var c1 = document.querySelector('.lf--1'); var c2 = document.querySelector('.lf--2');
-    if (c1 && c2) { console.log('[FS] Conteneurs .lf--1/.lf--2'); return [c1, c2]; }
-    var all = Array.prototype.slice.call(document.querySelectorAll('[class*="lf--"]'));
-    var top = [];
-    for (var i = 0; i < all.length; i++) {
-      var ok = true;
-      for (var j = 0; j < top.length; j++) { if (top[j].contains(all[i]) || all[i].contains(top[j])) { ok = false; break; } }
-      if (ok) { top.push(all[i]); if (top.length === 2) break; }
-    }
-    if (top.length === 2) { console.log('[FS] Conteneurs via [class*="lf--"] (ordre DOM)'); return top; }
-    console.warn('[FS] Aucun conteneur — fallback X-split'); return null;
-  }
-
-  var containers = findContainers();
   var RATING_RE = /^[3-9]\\.[0-9]$|^10\\.0$/;
   var MINUTE_RE = /^(\\d{1,3})'$/;
   var players = []; var seenKeys = {};
@@ -51,57 +34,29 @@ const SCRIPT_FLASHSCORE = `(function () {
     return /[a-zA-Z]/.test(txt);
   }
 
-  function findRowByOneLink(ratingEl) {
-    var el = ratingEl ? ratingEl.parentElement : null;
-    for (var up = 0; up < 8 && el && el !== document.body; up++) {
-      var links = el.querySelectorAll('a');
-      if (links.length === 1) { var t = (links[0].textContent || '').trim(); if (isValidName(t)) return { row: el, name: t }; }
-      el = el.parentElement;
-    }
-    return null;
-  }
+  var participantEls = document.querySelectorAll('[class*="lf__participantNew"]');
+  console.log('[FS] ' + participantEls.length + ' éléments lf__participantNew trouvés');
 
-  function findNameFallback(ratingEl) {
-    var el = ratingEl ? ratingEl.parentElement : null;
-    for (var up = 0; up < 6 && el && el !== document.body; up++) {
-      var named = el.querySelectorAll('[class*="Name"], [class*="name"]');
-      for (var i = 0; i < named.length; i++) { var t = (named[i].textContent || '').trim(); if (isValidName(t) && named[i].querySelectorAll('*').length < 4) return t; }
-      el = el.parentElement;
-    }
-    return null;
-  }
+  for (var i = 0; i < participantEls.length; i++) {
+    var el = participantEls[i];
+    var teamName = el.className.indexOf('lf__isReversed') !== -1 ? away : home;
 
-  function extractPlayers(root, teamName) {
-    var walker = document.createTreeWalker(root, 4, null, false); var tNode;
-    while ((tNode = walker.nextNode())) {
-      var rawTxt = (tNode.nodeValue || '').trim(); if (!RATING_RE.test(rawTxt)) continue;
-      var ratingEl = tNode.parentElement; if (!ratingEl) continue;
-      var rRect = ratingEl.getBoundingClientRect(); if (rRect.width === 0 && rRect.height === 0) continue;
-      var found = findRowByOneLink(ratingEl); var name = found ? found.name : findNameFallback(ratingEl); if (!name) continue;
-      var subMin = 90; var row = found ? found.row : ratingEl.parentElement;
-      if (row) { var desc = row.querySelectorAll('*'); for (var di = 0; di < desc.length; di++) { var mt = (desc[di].textContent || '').trim(); if (MINUTE_RE.test(mt)) { subMin = 90 - parseInt(MINUTE_RE.exec(mt)[1], 10); break; } } }
-      var key = name.toLowerCase().replace(/\\s+/g, ' ').trim(); if (seenKeys[key]) continue; seenKeys[key] = true;
-      players.push({ name: name, team: teamName, rating: parseFloat(rawTxt), goals: 0, assists: 0, minutes: (subMin > 0 && subMin <= 90) ? subMin : 90 });
-    }
-  }
+    var rating = null; var rawTxt = '';
+    var walker = document.createTreeWalker(el, 4, null, false); var tNode;
+    while ((tNode = walker.nextNode())) { var txt = (tNode.nodeValue || '').trim(); if (RATING_RE.test(txt)) { rawTxt = txt; rating = parseFloat(txt); break; } }
+    if (!rating) continue;
 
-  if (containers) {
-    extractPlayers(containers[0], home); extractPlayers(containers[1], away);
-  } else {
-    var hdr1 = document.querySelector('.duelParticipant__home'); var hdr2 = document.querySelector('.duelParticipant__away');
-    var splitX = (hdr1 && hdr2) ? ((hdr1.getBoundingClientRect().left + hdr1.getBoundingClientRect().right + hdr2.getBoundingClientRect().left + hdr2.getBoundingClientRect().right) / 4) : (document.documentElement.clientWidth / 2);
-    console.warn('[FS] Fallback X-split: ' + Math.round(splitX) + 'px');
-    var walker2 = document.createTreeWalker(document.body, 4, null, false); var tNode2;
-    while ((tNode2 = walker2.nextNode())) {
-      var rawTxt2 = (tNode2.nodeValue || '').trim(); if (!RATING_RE.test(rawTxt2)) continue;
-      var ratingEl2 = tNode2.parentElement; if (!ratingEl2) continue;
-      var rRect2 = ratingEl2.getBoundingClientRect(); if (rRect2.width === 0 && rRect2.height === 0) continue;
-      var found2 = findRowByOneLink(ratingEl2); var name2 = found2 ? found2.name : findNameFallback(ratingEl2); if (!name2) continue;
-      var subMin2 = 90; var row2 = found2 ? found2.row : ratingEl2.parentElement;
-      if (row2) { var desc2 = row2.querySelectorAll('*'); for (var di2 = 0; di2 < desc2.length; di2++) { var mt2 = (desc2[di2].textContent || '').trim(); if (MINUTE_RE.test(mt2)) { subMin2 = 90 - parseInt(MINUTE_RE.exec(mt2)[1], 10); break; } } }
-      var key2 = name2.toLowerCase().replace(/\\s+/g, ' ').trim(); if (seenKeys[key2]) continue; seenKeys[key2] = true;
-      players.push({ name: name2, team: (rRect2.left + rRect2.right) / 2 < splitX ? home : away, rating: parseFloat(rawTxt2), goals: 0, assists: 0, minutes: (subMin2 > 0 && subMin2 <= 90) ? subMin2 : 90 });
-    }
+    var name = null;
+    var links = el.querySelectorAll('a');
+    for (var li = 0; li < links.length; li++) { var lt = (links[li].textContent || '').trim(); if (isValidName(lt)) { name = lt; break; } }
+    if (!name) { var named = el.querySelectorAll('[class*="Name"], [class*="name"]'); for (var ni = 0; ni < named.length; ni++) { var nt = (named[ni].textContent || '').trim(); if (isValidName(nt) && named[ni].querySelectorAll('*').length < 4) { name = nt; break; } } }
+    if (!name) continue;
+
+    var subMin = 90; var allDesc = el.querySelectorAll('*');
+    for (var di = 0; di < allDesc.length; di++) { var mt = (allDesc[di].textContent || '').trim(); if (MINUTE_RE.test(mt)) { subMin = 90 - parseInt(MINUTE_RE.exec(mt)[1], 10); break; } }
+
+    var key = name.toLowerCase().replace(/\\s+/g, ' ').trim(); if (seenKeys[key]) continue; seenKeys[key] = true;
+    players.push({ name: name, team: teamName, rating: rating, goals: 0, assists: 0, minutes: (subMin > 0 && subMin <= 90) ? subMin : 90 });
   }
 
   if (!players.length) { alert('Aucun joueur avec note trouvé.\\n• Onglet "Compos" ouvert ?\\n• Match terminé ?'); return; }
