@@ -110,16 +110,11 @@
   // ── 2a. Titulaires — lf__formation (home) / lf__formationAway (away) ──────────
   var homeFormation = null;
   var awayFormation = null;
-  var allFormations = Array.prototype.slice.call(
-    document.querySelectorAll('[class*="lf__formation"]')
-  );
-  for (var f = 0; f < allFormations.length; f++) {
-    var fc = allFormations[f].className;
-    if (fc.indexOf('lf__formationAway') !== -1) {
-      if (!awayFormation) awayFormation = allFormations[f];
-    } else {
-      if (!homeFormation) homeFormation = allFormations[f];
-    }
+  var allFormations = document.querySelectorAll('[class*="lf__formation"]');
+  for (var fi = 0; fi < allFormations.length; fi++) {
+    var cls = allFormations[fi].className;
+    if (cls.indexOf('lf__formationAway') !== -1) { awayFormation = allFormations[fi]; }
+    else if (cls.indexOf('lf__formation') !== -1 && !homeFormation) { homeFormation = allFormations[fi]; }
   }
 
   if (homeFormation) {

@@ -51,8 +51,8 @@ const SCRIPT_FLASHSCORE = `(function () {
   }
 
   var homeFormation = null; var awayFormation = null;
-  var allFormations = Array.prototype.slice.call(document.querySelectorAll('[class*="lf__formation"]'));
-  for (var f = 0; f < allFormations.length; f++) { var fc = allFormations[f].className; if (fc.indexOf('lf__formationAway') !== -1) { if (!awayFormation) awayFormation = allFormations[f]; } else { if (!homeFormation) homeFormation = allFormations[f]; } }
+  var allFormations = document.querySelectorAll('[class*="lf__formation"]');
+  for (var fi = 0; fi < allFormations.length; fi++) { var cls = allFormations[fi].className; if (cls.indexOf('lf__formationAway') !== -1) { awayFormation = allFormations[fi]; } else if (cls.indexOf('lf__formation') !== -1 && !homeFormation) { homeFormation = allFormations[fi]; } }
 
   if (homeFormation) { var hs = homeFormation.querySelectorAll('[class*="lf__player"]'); console.log('[FS] Titulaires home : ' + hs.length); for (var hi = 0; hi < hs.length; hi++) processPlayerEl(hs[hi], home); } else { console.warn('[FS] Pas de formation home'); }
   if (awayFormation) { var as = awayFormation.querySelectorAll('[class*="lf__player"]'); console.log('[FS] Titulaires away : ' + as.length); for (var ai = 0; ai < as.length; ai++) processPlayerEl(as[ai], away); } else { console.warn('[FS] Pas de formation away'); }
