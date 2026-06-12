@@ -9,51 +9,42 @@ const SCRIPT_FLASHSCORE = `(function () {
   var API_CDM26   = 'https://cdm26-iota.vercel.app/api/admin/import-ratings';
 
   function getTeam(side) {
-    var sels = [
-      '.duelParticipant__' + side + ' .participant__participantName',
-      '.duelParticipant__' + side + ' .participant__overflow',
-    ];
-    for (var i = 0; i < sels.length; i++) {
-      var el = document.querySelector(sels[i]);
-      if (el) { var t = (el.textContent || '').trim(); if (t.length > 1) return t; }
-    }
+    var sels = ['.duelParticipant__' + side + ' .participant__participantName', '.duelParticipant__' + side + ' .participant__overflow'];
+    for (var i = 0; i < sels.length; i++) { var el = document.querySelector(sels[i]); if (el) { var t = (el.textContent || '').trim(); if (t.length > 1) return t; } }
     return null;
   }
 
-  var home = getTeam('home');
-  var away = getTeam('away');
-  if (!home || !away) {
-    alert('Équipes non trouvées.\\nOuvrez : flashscore.fr/match/football/…/compos/');
-    return;
-  }
+  var home = getTeam('home'); var away = getTeam('away');
+  if (!home || !away) { alert('Équipes non trouvées.\\nOuvrez : flashscore.fr/match/football/…/compos/'); return; }
 
   var today = new Date().toISOString().slice(0, 10);
   var date  = prompt('Date du match (YYYY-MM-DD) :', today);
   if (!date) return;
   console.log('[FS] ' + home + ' (dom.) vs ' + away + ' (ext.) — ' + date);
 
-  var homeHdr = document.querySelector('.duelParticipant__home');
-  var awayHdr = document.querySelector('.duelParticipant__away');
-  var splitX;
-  if (homeHdr && awayHdr) {
-    var hR = homeHdr.getBoundingClientRect();
-    var aR = awayHdr.getBoundingClientRect();
-    splitX = ((hR.left + hR.right) / 2 + (aR.left + aR.right) / 2) / 2;
-    console.log('[FS] home X: ' + Math.round((hR.left + hR.right) / 2) + '  away X: ' + Math.round((aR.left + aR.right) / 2) + '  split: ' + Math.round(splitX));
-  } else {
-    splitX = document.documentElement.clientWidth / 2;
-    console.warn('[FS] .duelParticipant non trouvés — split: ' + Math.round(splitX));
+  function findContainers() {
+    var c1 = document.querySelector('.lf--1'); var c2 = document.querySelector('.lf--2');
+    if (c1 && c2) { console.log('[FS] Conteneurs .lf--1/.lf--2'); return [c1, c2]; }
+    var all = Array.prototype.slice.call(document.querySelectorAll('[class*="lf--"]'));
+    var top = [];
+    for (var i = 0; i < all.length; i++) {
+      var ok = true;
+      for (var j = 0; j < top.length; j++) { if (top[j].contains(all[i]) || all[i].contains(top[j])) { ok = false; break; } }
+      if (ok) { top.push(all[i]); if (top.length === 2) break; }
+    }
+    if (top.length === 2) { console.log('[FS] Conteneurs via [class*="lf--"]'); return top; }
+    console.warn('[FS] Aucun conteneur lf-- — fallback X-split'); return null;
   }
 
+  var containers = findContainers();
   var RATING_RE = /^[3-9]\\.[0-9]$|^10\\.0$/;
   var MINUTE_RE = /^(\\d{1,3})'$/;
-  var players   = []; var seenKeys = {};
+  var players = []; var seenKeys = {};
 
   function isValidName(txt) {
     if (!txt || txt.length < 3 || txt.length > 50) return false;
     if (RATING_RE.test(txt)) return false;
-    if (/^\\d+$/.test(txt)) return false;
-    if (/^\\d+'?$/.test(txt)) return false;
+    if (/^\\d+$/.test(txt)) return false; if (/^\\d+'?$/.test(txt)) return false;
     if (/^\\d+:\\d+$/.test(txt)) return false;
     return /[a-zA-Z]/.test(txt);
   }
@@ -62,10 +53,7 @@ const SCRIPT_FLASHSCORE = `(function () {
     var el = ratingEl ? ratingEl.parentElement : null;
     for (var up = 0; up < 8 && el && el !== document.body; up++) {
       var links = el.querySelectorAll('a');
-      if (links.length === 1) {
-        var t = (links[0].textContent || '').trim();
-        if (isValidName(t)) return { row: el, name: t };
-      }
+      if (links.length === 1) { var t = (links[0].textContent || '').trim(); if (isValidName(t)) return { row: el, name: t }; }
       el = el.parentElement;
     }
     return null;
@@ -75,60 +63,54 @@ const SCRIPT_FLASHSCORE = `(function () {
     var el = ratingEl ? ratingEl.parentElement : null;
     for (var up = 0; up < 6 && el && el !== document.body; up++) {
       var named = el.querySelectorAll('[class*="Name"], [class*="name"]');
-      for (var i = 0; i < named.length; i++) {
-        var t = (named[i].textContent || '').trim();
-        if (isValidName(t) && named[i].querySelectorAll('*').length < 4) return t;
-      }
+      for (var i = 0; i < named.length; i++) { var t = (named[i].textContent || '').trim(); if (isValidName(t) && named[i].querySelectorAll('*').length < 4) return t; }
       el = el.parentElement;
     }
     return null;
   }
 
-  var walker = document.createTreeWalker(document.body, 4, null, false);
-  var tNode;
-  while ((tNode = walker.nextNode())) {
-    var rawTxt = (tNode.nodeValue || '').trim();
-    if (!RATING_RE.test(rawTxt)) continue;
-    var ratingEl = tNode.parentElement;
-    if (!ratingEl) continue;
-    var rRect = ratingEl.getBoundingClientRect();
-    if (rRect.width === 0 && rRect.height === 0) continue;
-
-    var found = findRowByOneLink(ratingEl);
-    var name  = found ? found.name : findNameFallback(ratingEl);
-    if (!name) continue;
-
-    var subMin = 90;
-    var row    = found ? found.row : ratingEl.parentElement;
-    if (row) {
-      var desc = row.querySelectorAll('*');
-      for (var di = 0; di < desc.length; di++) {
-        var mt = (desc[di].textContent || '').trim();
-        if (MINUTE_RE.test(mt)) { subMin = 90 - parseInt(MINUTE_RE.exec(mt)[1], 10); break; }
-      }
+  function extractPlayers(root, teamName) {
+    var walker = document.createTreeWalker(root, 4, null, false); var tNode;
+    while ((tNode = walker.nextNode())) {
+      var rawTxt = (tNode.nodeValue || '').trim(); if (!RATING_RE.test(rawTxt)) continue;
+      var ratingEl = tNode.parentElement; if (!ratingEl) continue;
+      var rRect = ratingEl.getBoundingClientRect(); if (rRect.width === 0 && rRect.height === 0) continue;
+      var found = findRowByOneLink(ratingEl); var name = found ? found.name : findNameFallback(ratingEl); if (!name) continue;
+      var subMin = 90; var row = found ? found.row : ratingEl.parentElement;
+      if (row) { var desc = row.querySelectorAll('*'); for (var di = 0; di < desc.length; di++) { var mt = (desc[di].textContent || '').trim(); if (MINUTE_RE.test(mt)) { subMin = 90 - parseInt(MINUTE_RE.exec(mt)[1], 10); break; } } }
+      var key = name.toLowerCase().replace(/\\s+/g, ' ').trim(); if (seenKeys[key]) continue; seenKeys[key] = true;
+      players.push({ name: name, team: teamName, rating: parseFloat(rawTxt), goals: 0, assists: 0, minutes: (subMin > 0 && subMin <= 90) ? subMin : 90 });
     }
-
-    var elX  = (rRect.left + rRect.right) / 2;
-    var team = elX < splitX ? home : away;
-    var key  = name.toLowerCase().replace(/\\s+/g, ' ').trim();
-    if (seenKeys[key]) continue;
-    seenKeys[key] = true;
-    players.push({ name: name, team: team, rating: parseFloat(rawTxt), goals: 0, assists: 0,
-                   minutes: (subMin > 0 && subMin <= 90) ? subMin : 90, _x: Math.round(elX) });
   }
 
-  if (!players.length) {
-    alert('Aucun joueur avec note trouvé.\\n• Onglet "Compos" ouvert ?\\n• Match terminé ?');
-    return;
+  if (containers) {
+    extractPlayers(containers[0], home); extractPlayers(containers[1], away);
+  } else {
+    var hdr1 = document.querySelector('.duelParticipant__home'); var hdr2 = document.querySelector('.duelParticipant__away');
+    var splitX = (hdr1 && hdr2) ? ((hdr1.getBoundingClientRect().left + hdr1.getBoundingClientRect().right + hdr2.getBoundingClientRect().left + hdr2.getBoundingClientRect().right) / 4) : (document.documentElement.clientWidth / 2);
+    console.warn('[FS] Fallback X-split: ' + Math.round(splitX) + 'px');
+    var walker2 = document.createTreeWalker(document.body, 4, null, false); var tNode2;
+    while ((tNode2 = walker2.nextNode())) {
+      var rawTxt2 = (tNode2.nodeValue || '').trim(); if (!RATING_RE.test(rawTxt2)) continue;
+      var ratingEl2 = tNode2.parentElement; if (!ratingEl2) continue;
+      var rRect2 = ratingEl2.getBoundingClientRect(); if (rRect2.width === 0 && rRect2.height === 0) continue;
+      var found2 = findRowByOneLink(ratingEl2); var name2 = found2 ? found2.name : findNameFallback(ratingEl2); if (!name2) continue;
+      var subMin2 = 90; var row2 = found2 ? found2.row : ratingEl2.parentElement;
+      if (row2) { var desc2 = row2.querySelectorAll('*'); for (var di2 = 0; di2 < desc2.length; di2++) { var mt2 = (desc2[di2].textContent || '').trim(); if (MINUTE_RE.test(mt2)) { subMin2 = 90 - parseInt(MINUTE_RE.exec(mt2)[1], 10); break; } } }
+      var key2 = name2.toLowerCase().replace(/\\s+/g, ' ').trim(); if (seenKeys[key2]) continue; seenKeys[key2] = true;
+      players.push({ name: name2, team: (rRect2.left + rRect2.right) / 2 < splitX ? home : away, rating: parseFloat(rawTxt2), goals: 0, assists: 0, minutes: (subMin2 > 0 && subMin2 <= 90) ? subMin2 : 90 });
+    }
   }
+
+  if (!players.length) { alert('Aucun joueur avec note trouvé.\\n• Onglet "Compos" ouvert ?\\n• Match terminé ?'); return; }
 
   var homeP = players.filter(function (p) { return p.team === home; });
   var awayP = players.filter(function (p) { return p.team === away; });
   console.log('\\n[FS] ══ ' + home + ' — ' + homeP.length + ' joueurs ══');
-  homeP.forEach(function (p) { console.log('  ' + p.name + ' ' + p.rating + ' x=' + p._x); });
+  homeP.forEach(function (p) { console.log('  ' + p.name + ' ' + p.rating + " (" + p.minutes + "')"); });
   console.log('\\n[FS] ══ ' + away + ' — ' + awayP.length + ' joueurs ══');
-  awayP.forEach(function (p) { console.log('  ' + p.name + ' ' + p.rating + ' x=' + p._x); });
-  console.log('\\n[FS] Total: ' + players.length + ' | split=' + Math.round(splitX) + 'px');
+  awayP.forEach(function (p) { console.log('  ' + p.name + ' ' + p.rating + " (" + p.minutes + "')"); });
+  console.log('\\n[FS] Total: ' + players.length + ' joueurs');
 
   if (homeP.length === 0 || awayP.length === 0) {
     if (!confirm('⚠ Attribution suspecte : ' + homeP.length + ' × ' + home + ' / ' + awayP.length + ' × ' + away + '.\\nContinuer ?')) return;
@@ -138,16 +120,12 @@ const SCRIPT_FLASHSCORE = `(function () {
     .then(function (r) { console.log('[FS] CDM26 OPTIONS → ' + r.status + '  ACAO: ' + r.headers.get('Access-Control-Allow-Origin')); })
     .catch(function (e) { console.warn('[FS] CDM26 OPTIONS échoué :', e.message); });
 
-  var cleanPlayers = players.map(function (p) {
-    return { name: p.name, team: p.team, rating: p.rating, goals: 0, assists: 0, minutes: p.minutes };
-  });
+  var cleanPlayers = players.map(function (p) { return { name: p.name, team: p.team, rating: p.rating, goals: 0, assists: 0, minutes: p.minutes }; });
   var payload  = JSON.stringify({ date: date, matches: [{ sofaId: 0, home: home, away: away, players: cleanPlayers }] });
   var postOpts = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload };
 
   function fetchJson(url, opts) {
-    return fetch(url, opts)
-      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; }); })
-      .catch(function (e) { return { ok: false, error: String(e) }; });
+    return fetch(url, opts).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; }); }).catch(function (e) { return { ok: false, error: String(e) }; });
   }
   function fmtResult(label, r) {
     if (!r.ok) return '❌ ' + label + ' : HTTP ' + (r.status || '?') + ' ' + ((r.data && r.data.error) || r.error || '');
@@ -161,11 +139,8 @@ const SCRIPT_FLASHSCORE = `(function () {
 
   console.log('[FS] Envoi en cours...');
   Promise.all([fetchJson(API_FANTASY, postOpts), fetchJson(API_CDM26, postOpts)]).then(function (results) {
-    alert(home + ' vs ' + away + ' — ' + players.length + ' joueurs\\n\\n' +
-          fmtResult('Fantasy', results[0]) + '\\n\\n' +
-          fmtResult('CDM26', results[1]));
-    console.log('[FS] Fantasy :', results[0]);
-    console.log('[FS] CDM26 :',   results[1]);
+    alert(home + ' vs ' + away + ' — ' + players.length + ' joueurs\\n\\n' + fmtResult('Fantasy', results[0]) + '\\n\\n' + fmtResult('CDM26', results[1]));
+    console.log('[FS] Fantasy :', results[0]); console.log('[FS] CDM26 :',   results[1]);
   });
 }());`
 

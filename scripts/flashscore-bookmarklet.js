@@ -7,12 +7,9 @@
  *   3. Coller ce script → Entrée
  *   4. Vérifier la liste affichée en console AVANT d'envoyer
  *
- * Stratégie d'attribution home/away :
- *   - Les noms des équipes sont lus depuis .duelParticipant__home/away (fiables)
- *   - Le split X est calculé depuis la position de ces deux éléments header
- *   - Pour chaque note trouvée, on compare son X au split → gauche = dom., droite = ext.
- *   - Les noms de joueurs sont trouvés via le pattern "ancêtre avec 1 seul <a>"
- *     (Flashscore lie TOUJOURS les noms de joueurs, jamais les notes ni positions)
+ * Attribution home/away :
+ *   Flashscore sépare les compos dans deux conteneurs .lf--1 (dom.) et .lf--2 (ext.).
+ *   On extrait les joueurs de chaque conteneur indépendamment — aucune coordonnée X.
  */
 (function () {
 
@@ -45,25 +42,37 @@
 
   console.log('[FS] ' + home + ' (dom.) vs ' + away + ' (ext.) — ' + date);
 
-  // ── 2. Split X depuis les headers .duelParticipant__home / __away ─────────────
-  // Ces éléments sont TOUJOURS home=gauche / away=droite sur Flashscore.
-  // Le split horizontal sépare fiablement les deux colonnes de compos.
-  var homeHdr = document.querySelector('.duelParticipant__home');
-  var awayHdr = document.querySelector('.duelParticipant__away');
-  var splitX;
-  if (homeHdr && awayHdr) {
-    var hR = homeHdr.getBoundingClientRect();
-    var aR = awayHdr.getBoundingClientRect();
-    splitX = ((hR.left + hR.right) / 2 + (aR.left + aR.right) / 2) / 2;
-    console.log('[FS] Headers trouvés — home X: ' + Math.round((hR.left + hR.right) / 2) +
-                '  away X: ' + Math.round((aR.left + aR.right) / 2) +
-                '  split: ' + Math.round(splitX));
-  } else {
-    splitX = document.documentElement.clientWidth / 2;
-    console.warn('[FS] .duelParticipant non trouvés — split par défaut: ' + Math.round(splitX));
+  // ── 2. Conteneurs home/away ───────────────────────────────────────────────────
+  // Flashscore sépare les deux colonnes de compos dans .lf--1 (dom.) et .lf--2 (ext.)
+  function findContainers() {
+    // Tentative 1 : classes exactes .lf--1 / .lf--2
+    var c1 = document.querySelector('.lf--1');
+    var c2 = document.querySelector('.lf--2');
+    if (c1 && c2) {
+      console.log('[FS] Conteneurs via .lf--1 / .lf--2');
+      return [c1, c2];
+    }
+    // Tentative 2 : [class*="lf--"] — 2 premiers conteneurs non imbriqués
+    var all = Array.prototype.slice.call(document.querySelectorAll('[class*="lf--"]'));
+    var top = [];
+    for (var i = 0; i < all.length; i++) {
+      var ok = true;
+      for (var j = 0; j < top.length; j++) {
+        if (top[j].contains(all[i]) || all[i].contains(top[j])) { ok = false; break; }
+      }
+      if (ok) { top.push(all[i]); if (top.length === 2) break; }
+    }
+    if (top.length === 2) {
+      console.log('[FS] Conteneurs via [class*="lf--"] (fallback)');
+      return top;
+    }
+    console.warn('[FS] Aucun conteneur lf-- trouvé — fallback X-split');
+    return null;
   }
 
-  // ── 3. Extraction de tous les joueurs notés ───────────────────────────────────
+  var containers = findContainers();
+
+  // ── 3. Extraction des joueurs ────────────────────────────────────────────────
   var RATING_RE = /^[3-9]\.[0-9]$|^10\.0$/;
   var MINUTE_RE = /^(\d{1,3})'$/;
   var players   = [];
@@ -78,9 +87,7 @@
     return /[a-zA-Z]/.test(txt);
   }
 
-  // Remonte depuis ratingEl jusqu'à trouver un ancêtre ayant exactement 1 lien <a>.
-  // Flashscore lie TOUJOURS et UNIQUEMENT le nom du joueur dans la ligne joueur.
-  // → ancêtre à 1 lien = la "ligne joueur" de ce joueur précis.
+  // Ancêtre avec exactement 1 lien = ligne joueur (Flashscore lie toujours le nom)
   function findRowByOneLink(ratingEl) {
     var el = ratingEl ? ratingEl.parentElement : null;
     for (var up = 0; up < 8 && el && el !== document.body; up++) {
@@ -94,7 +101,6 @@
     return null;
   }
 
-  // Plan B : cherche un élément "[class*=Name]" peu profond
   function findNameFallback(ratingEl) {
     var el = ratingEl ? ratingEl.parentElement : null;
     for (var up = 0; up < 6 && el && el !== document.body; up++) {
@@ -108,63 +114,95 @@
     return null;
   }
 
-  // TreeWalker sur TOUS les nœuds texte → cherche les patterns X.X (notes)
-  var walker = document.createTreeWalker(
-    document.body,
-    4,      // NodeFilter.SHOW_TEXT
-    null,
-    false
-  );
+  function extractPlayers(root, teamName) {
+    var walker = document.createTreeWalker(root, 4, null, false);
+    var tNode;
+    while ((tNode = walker.nextNode())) {
+      var rawTxt = (tNode.nodeValue || '').trim();
+      if (!RATING_RE.test(rawTxt)) continue;
 
-  var tNode;
-  while ((tNode = walker.nextNode())) {
-    var rawTxt = (tNode.nodeValue || '').trim();
-    if (!RATING_RE.test(rawTxt)) continue;
+      var ratingEl = tNode.parentElement;
+      if (!ratingEl) continue;
 
-    var ratingEl = tNode.parentElement;
-    if (!ratingEl) continue;
+      var rRect = ratingEl.getBoundingClientRect();
+      if (rRect.width === 0 && rRect.height === 0) continue;
 
-    // Ignorer les éléments invisibles
-    var rRect = ratingEl.getBoundingClientRect();
-    if (rRect.width === 0 && rRect.height === 0) continue;
+      var found = findRowByOneLink(ratingEl);
+      var name  = found ? found.name : findNameFallback(ratingEl);
+      if (!name) continue;
 
-    // Trouver la ligne joueur via le pattern "1 seul lien dans l'ancêtre"
-    var found = findRowByOneLink(ratingEl);
-    var name  = found ? found.name : findNameFallback(ratingEl);
-    if (!name) continue;
-
-    // Minutes jouées (remplaçants)
-    var subMin = 90;
-    var row    = found ? found.row : ratingEl.parentElement;
-    if (row) {
-      var desc = row.querySelectorAll('*');
-      for (var di = 0; di < desc.length; di++) {
-        var mt = (desc[di].textContent || '').trim();
-        if (MINUTE_RE.test(mt)) {
-          subMin = 90 - parseInt(MINUTE_RE.exec(mt)[1], 10);
-          break;
+      var subMin = 90;
+      var row    = found ? found.row : ratingEl.parentElement;
+      if (row) {
+        var desc = row.querySelectorAll('*');
+        for (var di = 0; di < desc.length; di++) {
+          var mt = (desc[di].textContent || '').trim();
+          if (MINUTE_RE.test(mt)) { subMin = 90 - parseInt(MINUTE_RE.exec(mt)[1], 10); break; }
         }
       }
+
+      var key = name.toLowerCase().replace(/\s+/g, ' ').trim();
+      if (seenKeys[key]) continue;
+      seenKeys[key] = true;
+
+      players.push({
+        name:    name,
+        team:    teamName,
+        rating:  parseFloat(rawTxt),
+        goals:   0,
+        assists: 0,
+        minutes: (subMin > 0 && subMin <= 90) ? subMin : 90,
+      });
     }
+  }
 
-    // Attribution de l'équipe : position X de l'élément note vs split X
-    var elX  = (rRect.left + rRect.right) / 2;
-    var team = elX < splitX ? home : away;
+  if (containers) {
+    extractPlayers(containers[0], home);
+    extractPlayers(containers[1], away);
+  } else {
+    // Fallback : X-split depuis les headers .duelParticipant__home / __away
+    var hdr1   = document.querySelector('.duelParticipant__home');
+    var hdr2   = document.querySelector('.duelParticipant__away');
+    var splitX = (hdr1 && hdr2)
+      ? ((hdr1.getBoundingClientRect().left + hdr1.getBoundingClientRect().right +
+          hdr2.getBoundingClientRect().left + hdr2.getBoundingClientRect().right) / 4)
+      : (document.documentElement.clientWidth / 2);
+    console.warn('[FS] Fallback X-split: ' + Math.round(splitX) + 'px');
 
-    // Déduplication
-    var key = name.toLowerCase().replace(/\s+/g, ' ').trim();
-    if (seenKeys[key]) continue;
-    seenKeys[key] = true;
-
-    players.push({
-      name:    name,
-      team:    team,
-      rating:  parseFloat(rawTxt),
-      goals:   0,
-      assists: 0,
-      minutes: (subMin > 0 && subMin <= 90) ? subMin : 90,
-      _x:      Math.round(elX)
-    });
+    var walker2 = document.createTreeWalker(document.body, 4, null, false);
+    var tNode2;
+    while ((tNode2 = walker2.nextNode())) {
+      var rawTxt2 = (tNode2.nodeValue || '').trim();
+      if (!RATING_RE.test(rawTxt2)) continue;
+      var ratingEl2 = tNode2.parentElement;
+      if (!ratingEl2) continue;
+      var rRect2 = ratingEl2.getBoundingClientRect();
+      if (rRect2.width === 0 && rRect2.height === 0) continue;
+      var found2 = findRowByOneLink(ratingEl2);
+      var name2  = found2 ? found2.name : findNameFallback(ratingEl2);
+      if (!name2) continue;
+      var subMin2 = 90;
+      var row2    = found2 ? found2.row : ratingEl2.parentElement;
+      if (row2) {
+        var desc2 = row2.querySelectorAll('*');
+        for (var di2 = 0; di2 < desc2.length; di2++) {
+          var mt2 = (desc2[di2].textContent || '').trim();
+          if (MINUTE_RE.test(mt2)) { subMin2 = 90 - parseInt(MINUTE_RE.exec(mt2)[1], 10); break; }
+        }
+      }
+      var elX2 = (rRect2.left + rRect2.right) / 2;
+      var key2 = name2.toLowerCase().replace(/\s+/g, ' ').trim();
+      if (seenKeys[key2]) continue;
+      seenKeys[key2] = true;
+      players.push({
+        name:    name2,
+        team:    elX2 < splitX ? home : away,
+        rating:  parseFloat(rawTxt2),
+        goals:   0,
+        assists: 0,
+        minutes: (subMin2 > 0 && subMin2 <= 90) ? subMin2 : 90,
+      });
+    }
   }
 
   // ── 4. Log complet pour vérification AVANT envoi ──────────────────────────────
@@ -178,32 +216,28 @@
 
   console.log('\n[FS] ══════ ' + home + ' — ' + homeP.length + ' joueurs ══════');
   homeP.forEach(function (p) {
-    console.log('  ' + p.name + ' ' + p.rating + '  (' + p.minutes + "')" + '  x=' + p._x);
+    console.log('  ' + p.name + ' ' + p.rating + "  (" + p.minutes + "')");
   });
   console.log('\n[FS] ══════ ' + away + ' — ' + awayP.length + ' joueurs ══════');
   awayP.forEach(function (p) {
-    console.log('  ' + p.name + ' ' + p.rating + '  (' + p.minutes + "')" + '  x=' + p._x);
+    console.log('  ' + p.name + ' ' + p.rating + "  (" + p.minutes + "')");
   });
-  console.log('\n[FS] Total: ' + players.length + ' joueurs | splitX=' + Math.round(splitX) + 'px');
+  console.log('\n[FS] Total: ' + players.length + ' joueurs');
 
-  // Avertissement si déséquilibre suspect
   if (homeP.length === 0 || awayP.length === 0) {
     var msg = '⚠ Attribution suspecte : ' + homeP.length + ' × ' + home +
               ' / ' + awayP.length + ' × ' + away +
-              '\n\nVérifiez la console (colonne x= vs split ' + Math.round(splitX) + 'px).' +
               '\n\nContinuer quand même ?';
     if (!confirm(msg)) return;
   }
 
-  // ── 5. Test preflight OPTIONS sur CDM26 (debug CORS) ─────────────────────────
+  // ── 5. Test preflight OPTIONS sur CDM26 ──────────────────────────────────────
   fetch(API_CDM26, { method: 'OPTIONS' })
     .then(function (r) {
-      console.log('[FS] CDM26 OPTIONS preflight → ' + r.status +
+      console.log('[FS] CDM26 OPTIONS → ' + r.status +
                   '  ACAO: ' + r.headers.get('Access-Control-Allow-Origin'));
     })
-    .catch(function (e) {
-      console.warn('[FS] CDM26 OPTIONS échoué :', e.message);
-    });
+    .catch(function (e) { console.warn('[FS] CDM26 OPTIONS échoué :', e.message); });
 
   // ── 6. Envoi vers les deux APIs en parallèle ──────────────────────────────────
   var cleanPlayers = players.map(function (p) {
