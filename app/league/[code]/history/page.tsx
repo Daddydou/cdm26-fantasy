@@ -80,17 +80,14 @@ export default function HistoryPage() {
       setParticipants(allP)
       const nameById = new Map(allP.map(s => [s.id, s.display_name]))
 
-      const { data: squads } = await supabase
-        .from('fantasy_squads')
-        .select(`
-          id, bought_at_price, bought_at_phase,
-          sold_at_price, sold_at_phase, sold_at, active, created_at, participant_id,
-          fantasy_players(id, name, position, team, photo_url)
-        `)
-        .eq('league_id', lg.id)
-        .order('created_at', { ascending: false })
+      // Route API avec service role pour bypasser le RLS sur fantasy_squads
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`/api/league/${code}/transfers`, {
+        headers: { Authorization: `Bearer ${session?.access_token ?? ''}` },
+      })
+      const json = res.ok ? await res.json() : { transfers: [] }
 
-      const mapped: Transfer[] = ((squads || []) as unknown as SquadRow[]).map(s => ({
+      const mapped: Transfer[] = ((json.transfers || []) as unknown as SquadRow[]).map(s => ({
         id: s.id,
         player_name: s.fantasy_players?.name || '?',
         player_id: s.fantasy_players?.id || '',
