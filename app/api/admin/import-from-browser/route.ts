@@ -47,7 +47,7 @@ const TEAM_MAP: Record<string, string> = {
 
 function normalize(s: string) {
   // eslint-disable-next-line no-misleading-character-class
-  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/-/g, ' ').trim()
 }
 
 type DbPlayer = { id: string; name: string; team: string }
@@ -238,10 +238,15 @@ export async function POST(req: NextRequest) {
       fetched_at: string
     }> = []
 
+    let logCount = 0
     for (const p of m.players) {
       if (p.rating == null) continue
       const frTeam = TEAM_MAP[p.team] ?? p.team
       const player = findPlayer(p.name, frTeam)
+      if (logCount < 5) {
+        console.log('[import] joueur:', p.name, '→ normalisé:', normalize(p.name), 'match:', player?.name ?? 'NON TROUVÉ')
+        logCount++
+      }
       if (!player) {
         unmatched.push(`${p.name} (${p.team})`)
         continue
