@@ -34,30 +34,32 @@ const SCRIPT_FLASHSCORE = `(function () {
     return /[a-zA-Z]/.test(txt);
   }
 
-  var participantEls = document.querySelectorAll('[class*="lf__participantNew"]');
-  console.log('[FS] ' + participantEls.length + ' éléments lf__participantNew trouvés');
-
-  for (var i = 0; i < participantEls.length; i++) {
-    var el = participantEls[i];
-    var teamName = el.className.indexOf('lf__isReversed') !== -1 ? away : home;
-
+  function processPlayerEl(el, teamName) {
     var rating = null; var rawTxt = '';
     var walker = document.createTreeWalker(el, 4, null, false); var tNode;
     while ((tNode = walker.nextNode())) { var txt = (tNode.nodeValue || '').trim(); if (RATING_RE.test(txt)) { rawTxt = txt; rating = parseFloat(txt); break; } }
-    if (!rating) continue;
-
+    if (!rating) return;
     var name = null;
     var links = el.querySelectorAll('a');
     for (var li = 0; li < links.length; li++) { var lt = (links[li].textContent || '').trim(); if (isValidName(lt)) { name = lt; break; } }
     if (!name) { var named = el.querySelectorAll('[class*="Name"], [class*="name"]'); for (var ni = 0; ni < named.length; ni++) { var nt = (named[ni].textContent || '').trim(); if (isValidName(nt) && named[ni].querySelectorAll('*').length < 4) { name = nt; break; } } }
-    if (!name) continue;
-
+    if (!name) return;
     var subMin = 90; var allDesc = el.querySelectorAll('*');
     for (var di = 0; di < allDesc.length; di++) { var mt = (allDesc[di].textContent || '').trim(); if (MINUTE_RE.test(mt)) { subMin = 90 - parseInt(MINUTE_RE.exec(mt)[1], 10); break; } }
-
-    var key = name.toLowerCase().replace(/\\s+/g, ' ').trim(); if (seenKeys[key]) continue; seenKeys[key] = true;
+    var key = name.toLowerCase().replace(/\\s+/g, ' ').trim(); if (seenKeys[key]) return; seenKeys[key] = true;
     players.push({ name: name, team: teamName, rating: rating, goals: 0, assists: 0, minutes: (subMin > 0 && subMin <= 90) ? subMin : 90 });
   }
+
+  var homeFormation = null; var awayFormation = null;
+  var allFormations = Array.prototype.slice.call(document.querySelectorAll('[class*="lf__formation"]'));
+  for (var f = 0; f < allFormations.length; f++) { var fc = allFormations[f].className; if (fc.indexOf('lf__formationAway') !== -1) { if (!awayFormation) awayFormation = allFormations[f]; } else { if (!homeFormation) homeFormation = allFormations[f]; } }
+
+  if (homeFormation) { var hs = homeFormation.querySelectorAll('[class*="lf__player"]'); console.log('[FS] Titulaires home : ' + hs.length); for (var hi = 0; hi < hs.length; hi++) processPlayerEl(hs[hi], home); } else { console.warn('[FS] Pas de formation home'); }
+  if (awayFormation) { var as = awayFormation.querySelectorAll('[class*="lf__player"]'); console.log('[FS] Titulaires away : ' + as.length); for (var ai = 0; ai < as.length; ai++) processPlayerEl(as[ai], away); } else { console.warn('[FS] Pas de formation away'); }
+
+  var participantEls = document.querySelectorAll('[class*="lf__participantNew"]');
+  console.log('[FS] Remplaçants : ' + participantEls.length);
+  for (var pi = 0; pi < participantEls.length; pi++) { var pel = participantEls[pi]; processPlayerEl(pel, pel.className.indexOf('lf__isReversed') !== -1 ? away : home); }
 
   if (!players.length) { alert('Aucun joueur avec note trouvé.\\n• Onglet "Compos" ouvert ?\\n• Match terminé ?'); return; }
 

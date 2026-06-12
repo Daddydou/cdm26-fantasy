@@ -7,9 +7,9 @@
  *   3. Coller ce script → Entrée
  *   4. Vérifier la liste affichée en console AVANT d'envoyer
  *
- * Attribution home/away :
- *   Chaque joueur est dans un élément [class*="lf__participantNew"].
- *   La présence de "lf__isReversed" dans la classe indique l'équipe extérieure.
+ * Sources :
+ *   - Titulaires  : lf__formation (home) / lf__formationAway (away) → lf__player
+ *   - Remplaçants : lf__participantNew, lf__isReversed = away
  */
 (function () {
 
@@ -42,7 +42,7 @@
 
   console.log('[FS] ' + home + ' (dom.) vs ' + away + ' (ext.) — ' + date);
 
-  // ── 2. Extraction des joueurs via lf__participantNew / lf__isReversed ─────────
+  // ── 2. Extraction ─────────────────────────────────────────────────────────────
   var RATING_RE = /^[3-9]\.[0-9]$|^10\.0$/;
   var MINUTE_RE = /^(\d{1,3})'$/;
   var players   = [];
@@ -57,15 +57,8 @@
     return /[a-zA-Z]/.test(txt);
   }
 
-  var participantEls = document.querySelectorAll('[class*="lf__participantNew"]');
-  console.log('[FS] ' + participantEls.length + ' éléments lf__participantNew trouvés');
-
-  for (var i = 0; i < participantEls.length; i++) {
-    var el       = participantEls[i];
-    var isAway   = el.className.indexOf('lf__isReversed') !== -1;
-    var teamName = isAway ? away : home;
-
-    // Note : TreeWalker sur les nœuds texte de l'élément
+  function processPlayerEl(el, teamName) {
+    // Note
     var rating = null;
     var rawTxt = '';
     var walker = document.createTreeWalker(el, 4, null, false);
@@ -74,16 +67,14 @@
       var txt = (tNode.nodeValue || '').trim();
       if (RATING_RE.test(txt)) { rawTxt = txt; rating = parseFloat(txt); break; }
     }
-    if (!rating) continue;
+    if (!rating) return;
 
-    // Nom : d'abord le seul lien dans l'élément, sinon [class*="name"]
+    // Nom : premier lien valide, sinon [class*="name"]
     var name = null;
     var links = el.querySelectorAll('a');
-    if (links.length >= 1) {
-      for (var li = 0; li < links.length; li++) {
-        var lt = (links[li].textContent || '').trim();
-        if (isValidName(lt)) { name = lt; break; }
-      }
+    for (var li = 0; li < links.length; li++) {
+      var lt = (links[li].textContent || '').trim();
+      if (isValidName(lt)) { name = lt; break; }
     }
     if (!name) {
       var named = el.querySelectorAll('[class*="Name"], [class*="name"]');
@@ -92,7 +83,7 @@
         if (isValidName(nt) && named[ni].querySelectorAll('*').length < 4) { name = nt; break; }
       }
     }
-    if (!name) continue;
+    if (!name) return;
 
     // Minutes jouées (remplaçants sortis)
     var subMin  = 90;
@@ -103,7 +94,7 @@
     }
 
     var key = name.toLowerCase().replace(/\s+/g, ' ').trim();
-    if (seenKeys[key]) continue;
+    if (seenKeys[key]) return;
     seenKeys[key] = true;
 
     players.push({
@@ -114,6 +105,50 @@
       assists: 0,
       minutes: (subMin > 0 && subMin <= 90) ? subMin : 90,
     });
+  }
+
+  // ── 2a. Titulaires — lf__formation (home) / lf__formationAway (away) ──────────
+  var homeFormation = null;
+  var awayFormation = null;
+  var allFormations = Array.prototype.slice.call(
+    document.querySelectorAll('[class*="lf__formation"]')
+  );
+  for (var f = 0; f < allFormations.length; f++) {
+    var fc = allFormations[f].className;
+    if (fc.indexOf('lf__formationAway') !== -1) {
+      if (!awayFormation) awayFormation = allFormations[f];
+    } else {
+      if (!homeFormation) homeFormation = allFormations[f];
+    }
+  }
+
+  if (homeFormation) {
+    var homeStarters = homeFormation.querySelectorAll('[class*="lf__player"]');
+    console.log('[FS] Titulaires home : ' + homeStarters.length + ' éléments lf__player');
+    for (var hs = 0; hs < homeStarters.length; hs++) {
+      processPlayerEl(homeStarters[hs], home);
+    }
+  } else {
+    console.warn('[FS] Aucune formation home trouvée');
+  }
+
+  if (awayFormation) {
+    var awayStarters = awayFormation.querySelectorAll('[class*="lf__player"]');
+    console.log('[FS] Titulaires away : ' + awayStarters.length + ' éléments lf__player');
+    for (var as = 0; as < awayStarters.length; as++) {
+      processPlayerEl(awayStarters[as], away);
+    }
+  } else {
+    console.warn('[FS] Aucune formation away trouvée');
+  }
+
+  // ── 2b. Remplaçants — lf__participantNew, lf__isReversed = away ───────────────
+  var participantEls = document.querySelectorAll('[class*="lf__participantNew"]');
+  console.log('[FS] Remplaçants : ' + participantEls.length + ' éléments lf__participantNew');
+  for (var pi = 0; pi < participantEls.length; pi++) {
+    var pel      = participantEls[pi];
+    var pelTeam  = pel.className.indexOf('lf__isReversed') !== -1 ? away : home;
+    processPlayerEl(pel, pelTeam);
   }
 
   // ── 3. Log complet pour vérification AVANT envoi ──────────────────────────────
