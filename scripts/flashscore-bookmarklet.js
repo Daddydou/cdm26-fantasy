@@ -114,6 +114,23 @@
   var homeFormation = document.querySelector('[class*="lf__formation--extended"]');
   var awayFormation = document.querySelector('[class*="lf__formationAway"]');
 
+  // Fallback home : premier lf__formation sans Away qui contient des lf__player
+  if (!homeFormation) {
+    var allFormEls = document.querySelectorAll('[class*="lf__formation"]');
+    for (var fi = 0; fi < allFormEls.length; fi++) {
+      var fcls = allFormEls[fi].className;
+      if (fcls.indexOf('Away') === -1 && allFormEls[fi].querySelectorAll('[class*="lf__player"]').length > 0) {
+        homeFormation = allFormEls[fi];
+        console.log('[FS] Fallback home formation utilisée : ' + fcls);
+        break;
+      }
+    }
+  }
+
+  if (!homeFormation && !awayFormation) {
+    console.warn('[FS] Aucune formation trouvée — fallback lf__participantNew uniquement');
+  }
+
   if (homeFormation) {
     var homeStarters = homeFormation.querySelectorAll('[class*="lf__player"]');
     console.log('[FS] Titulaires home : ' + homeStarters.length + ' éléments lf__player');
