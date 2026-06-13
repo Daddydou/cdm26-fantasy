@@ -20,7 +20,16 @@ export default function MatchesPage() {
   const { code } = useParams<{ code: string }>()
   const router = useRouter()
   const [matches, setMatches] = useState<MatchWithScores[]>([])
+  const [openIds, setOpenIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
+
+  function toggle(id: string) {
+    setOpenIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
 
   useEffect(() => {
     async function load() {
@@ -87,6 +96,7 @@ export default function MatchesPage() {
 
       <div className="space-y-4">
         {matches.map(m => {
+          const open = openIds.has(m.id)
           const homeScores = m.scores
             .filter(s => s.team === m.home_team)
             .sort((a, b) => b.rating - a.rating)
@@ -99,19 +109,31 @@ export default function MatchesPage() {
 
           return (
             <div key={m.id} className="card overflow-hidden">
-              <div className="px-4 py-3 bg-white/5 border-b border-white/5 flex items-center justify-between">
-                <span className="text-sm font-semibold text-white">
-                  {m.home_team} — {m.away_team}
-                </span>
-                <div className="text-right flex-shrink-0 ml-2">
-                  <p className="text-xs text-white/40">{date}</p>
-                  {m.round && <p className="text-[10px] text-white/25">{m.round}</p>}
+              <div className="px-4 py-3 flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-white truncate">
+                    {m.home_team} — {m.away_team}
+                  </p>
+                  <p className="text-xs text-white/40">
+                    {date}{m.round ? ` · ${m.round}` : ''}
+                  </p>
                 </div>
+                <button
+                  onClick={() => toggle(m.id)}
+                  className="flex-shrink-0 text-xs text-brand-400 hover:text-brand-300 px-2 py-1 rounded bg-white/5 hover:bg-white/10 transition-colors"
+                >
+                  Notes {open ? '▲' : '▼'}
+                </button>
               </div>
 
-              <TeamSection label={m.home_team} scores={homeScores} />
-              <div className="h-px bg-white/5" />
-              <TeamSection label={m.away_team} scores={awayScores} />
+              {open && (
+                <>
+                  <div className="h-px bg-white/5" />
+                  <TeamSection label={m.home_team} scores={homeScores} />
+                  <div className="h-px bg-white/5" />
+                  <TeamSection label={m.away_team} scores={awayScores} />
+                </>
+              )}
             </div>
           )
         })}
