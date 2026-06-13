@@ -275,13 +275,14 @@ export async function POST(req: NextRequest) {
         .from('fantasy_scores')
         .upsert(deduped, { onConflict: 'player_id,match_id' })
       console.log('[import] INSERT résultat:', upsertErr ? 0 : deduped.length, 'erreur:', upsertErr?.message, 'code:', upsertErr?.code)
-      if (!upsertErr) imported += deduped.length
+      if (!upsertErr) {
+        imported += deduped.length
+        await supabaseAdmin
+          .from('fantasy_matches')
+          .update({ processed: true })
+          .eq('id', match.id)
+      }
     }
-
-    await supabaseAdmin
-      .from('fantasy_matches')
-      .update({ processed: true })
-      .eq('id', match.id)
   }
 
   return NextResponse.json({ imported, unmatched }, { headers: c })
