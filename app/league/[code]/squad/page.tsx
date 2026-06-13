@@ -19,6 +19,7 @@ export default function SquadPage() {
   const [participants, setParticipants] = useState<ParticipantSummary[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [squads, setSquads] = useState<Record<string, SquadDetail[]>>({})
+  const [teamMatchCounts, setTeamMatchCounts] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [loadingSquad, setLoadingSquad] = useState(false)
   const [selling, setSelling] = useState<string | null>(null)
@@ -42,9 +43,20 @@ export default function SquadPage() {
         .order('display_name')
       const allP = (standings || []).map(s => ({ id: s.participant_id, display_name: s.display_name, budget_remaining: s.budget_remaining }))
       setParticipants(allP)
-      const { data: sq } = await supabase.from('fantasy_squad_detail').select().eq('participant_id', p.id).eq('active', true).order('position')
+      const [{ data: sq }, { data: processedMatches }] = await Promise.all([
+        supabase.from('fantasy_squad_detail').select().eq('participant_id', p.id).eq('active', true).order('position'),
+        supabase.from('fantasy_matches').select('home_team, away_team').eq('processed', true),
+      ])
       setSquads({ [p.id]: sq || [] })
       setSelectedId(p.id)
+
+      const teamCounts: Record<string, number> = {}
+      for (const m of processedMatches || []) {
+        teamCounts[m.home_team] = (teamCounts[m.home_team] || 0) + 1
+        teamCounts[m.away_team] = (teamCounts[m.away_team] || 0) + 1
+      }
+      setTeamMatchCounts(teamCounts)
+
       setLoading(false)
     }
     load()
@@ -187,6 +199,9 @@ export default function SquadPage() {
                       {p.player_name}
                     </Link>
                     <p className="text-xs text-white/40">{p.team} · Acheté {p.bought_at_price} cr.</p>
+                    <p className="text-xs text-white/30">
+                      {Number(p.total_rating).toFixed(1)} pts · {teamMatchCounts[p.team] ?? 0} match{(teamMatchCounts[p.team] ?? 0) > 1 ? 's' : ''} équipe
+                    </p>
                   </div>
                   <div className="text-right flex-shrink-0">
                     <p className="text-sm font-bold text-white">{Number(p.total_rating).toFixed(1)}</p>

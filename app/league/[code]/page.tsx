@@ -13,6 +13,7 @@ export default function LeaguePage() {
   const [league, setLeague] = useState<League | null>(null)
   const [me, setMe] = useState<Participant | null>(null)
   const [standings, setStandings] = useState<Standing[]>([])
+  const [matchCounts, setMatchCounts] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
 
@@ -41,13 +42,25 @@ export default function LeaguePage() {
       if (!participant) { router.push('/'); return }
       setMe(participant)
 
-      const { data: st } = await supabase
-        .from('fantasy_standings')
-        .select()
-        .eq('league_id', lg.id)
-        .order('total_points', { ascending: false })
+      const [{ data: st }, { data: allSquads }, { data: processedMatches }] = await Promise.all([
+        supabase.from('fantasy_standings').select().eq('league_id', lg.id).order('total_points', { ascending: false }),
+        supabase.from('fantasy_squad_detail').select('participant_id, team').eq('league_id', lg.id).eq('active', true),
+        supabase.from('fantasy_matches').select('home_team, away_team').eq('processed', true),
+      ])
 
       setStandings(st || [])
+
+      const teamsByParticipant: Record<string, Set<string>> = {}
+      for (const s of allSquads || []) {
+        if (!teamsByParticipant[s.participant_id]) teamsByParticipant[s.participant_id] = new Set()
+        teamsByParticipant[s.participant_id].add(s.team)
+      }
+      const counts: Record<string, number> = {}
+      for (const [pid, teams] of Object.entries(teamsByParticipant)) {
+        counts[pid] = (processedMatches || []).filter(m => teams.has(m.home_team) || teams.has(m.away_team)).length
+      }
+      setMatchCounts(counts)
+
       setLoading(false)
     }
     load()
@@ -222,8 +235,15 @@ export default function LeaguePage() {
                   {s.display_name}
                   {s.participant_id === me.id && <span className="text-brand-400 ml-1">(toi)</span>}
                 </span>
-                <span className="text-sm font-bold text-white">{Number(s.total_points).toFixed(1)}</span>
-                <span className="text-xs text-white/30">pts</span>
+                <div className="text-right flex-shrink-0">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-sm font-bold text-white">{Number(s.total_points).toFixed(1)}</span>
+                    <span className="text-xs text-white/30">pts</span>
+                  </div>
+                  <p className="text-xs text-white/30">
+                    {matchCounts[s.participant_id] ?? 0} match{(matchCounts[s.participant_id] ?? 0) > 1 ? 's' : ''}
+                  </p>
+                </div>
               </div>
             ))}
           </div>
