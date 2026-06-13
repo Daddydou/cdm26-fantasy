@@ -120,6 +120,49 @@ export default function LeaguePage() {
         </div>
       </div>
 
+      {/* Mini classement */}
+      {standings.length > 0 && (
+        <div className="card mb-6">
+          <div className="p-4 border-b border-white/5">
+            <h2 className="text-sm font-semibold text-white">Classement actuel</h2>
+          </div>
+          <div>
+            {standings.slice(0, 5).map((s, i) => (
+              <div
+                key={s.participant_id}
+                className={`flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0 ${
+                  s.participant_id === me.id ? 'bg-brand-500/5' : ''
+                }`}
+              >
+                <span className={`w-6 text-center text-sm font-bold ${
+                  i === 0 ? 'text-yellow-400' : i === 1 ? 'text-gray-300' : i === 2 ? 'text-amber-600' : 'text-white/30'
+                }`}>
+                  {i + 1}
+                </span>
+                <span className="flex-1 text-sm text-white truncate">
+                  {s.display_name}
+                  {s.participant_id === me.id && <span className="text-brand-400 ml-1">(toi)</span>}
+                </span>
+                <div className="text-right flex-shrink-0">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-sm font-bold text-white">{Number(s.total_points).toFixed(1)}</span>
+                    <span className="text-xs text-white/30">pts</span>
+                  </div>
+                  <p className="text-xs text-white/30">
+                    {matchCounts[s.participant_id] ?? 0} match{(matchCounts[s.participant_id] ?? 0) > 1 ? 's' : ''}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+          {standings.length > 5 && (
+            <Link href={`/league/${code}/standings`} className="block text-center p-3 text-xs text-brand-400 hover:text-brand-300">
+              Voir tout le classement →
+            </Link>
+          )}
+        </div>
+      )}
+
       {/* CTA */}
       <div className="grid grid-cols-2 gap-3 mb-6">
         <Link
@@ -212,48 +255,6 @@ export default function LeaguePage() {
         </button>
       </div>
 
-      {/* Mini classement */}
-      {standings.length > 0 && (
-        <div className="card">
-          <div className="p-4 border-b border-white/5">
-            <h2 className="text-sm font-semibold text-white">Classement actuel</h2>
-          </div>
-          <div>
-            {standings.slice(0, 5).map((s, i) => (
-              <div
-                key={s.participant_id}
-                className={`flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0 ${
-                  s.participant_id === me.id ? 'bg-brand-500/5' : ''
-                }`}
-              >
-                <span className={`w-6 text-center text-sm font-bold ${
-                  i === 0 ? 'text-yellow-400' : i === 1 ? 'text-gray-300' : i === 2 ? 'text-amber-600' : 'text-white/30'
-                }`}>
-                  {i + 1}
-                </span>
-                <span className="flex-1 text-sm text-white truncate">
-                  {s.display_name}
-                  {s.participant_id === me.id && <span className="text-brand-400 ml-1">(toi)</span>}
-                </span>
-                <div className="text-right flex-shrink-0">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-sm font-bold text-white">{Number(s.total_points).toFixed(1)}</span>
-                    <span className="text-xs text-white/30">pts</span>
-                  </div>
-                  <p className="text-xs text-white/30">
-                    {matchCounts[s.participant_id] ?? 0} match{(matchCounts[s.participant_id] ?? 0) > 1 ? 's' : ''}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-          {standings.length > 5 && (
-            <Link href={`/league/${code}/standings`} className="block text-center p-3 text-xs text-brand-400 hover:text-brand-300">
-              Voir tout le classement →
-            </Link>
-          )}
-        </div>
-      )}
     </main>
   )
 }
