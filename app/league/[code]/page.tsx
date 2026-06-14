@@ -50,7 +50,7 @@ export default function LeaguePage() {
       const [{ data: st }, { data: allSquads }, { data: processedMatches }] = await Promise.all([
         supabase.from('fantasy_standings').select().eq('league_id', lg.id).order('total_points', { ascending: false }),
         supabase.from('fantasy_squad_detail').select('participant_id, team, player_id, player_name').eq('league_id', lg.id).eq('active', true),
-        supabase.from('fantasy_matches').select('home_team, away_team').eq('processed', true),
+        supabase.from('fantasy_matches').select('id, match_date, home_team, away_team').eq('processed', true).order('match_date', { ascending: false }),
       ])
 
       setStandings(st || [])
@@ -71,6 +71,7 @@ export default function LeaguePage() {
       const squadByP: Record<string, string[]> = {}
       const playerToParticipant: Record<string, string> = {}
       const participantNameMap: Record<string, string> = {}
+      const teamToPlayerIds: Record<string, string[]> = {}
 
       for (const s of allSquads || []) {
         const sq = s as { participant_id: string; team: string; player_id: string; player_name: string }
@@ -79,6 +80,8 @@ export default function LeaguePage() {
           playerToParticipant[sq.player_id] = sq.participant_id
           if (!squadByP[sq.participant_id]) squadByP[sq.participant_id] = []
           squadByP[sq.participant_id].push(sq.player_id)
+          if (!teamToPlayerIds[sq.team]) teamToPlayerIds[sq.team] = []
+          if (!teamToPlayerIds[sq.team].includes(sq.player_id)) teamToPlayerIds[sq.team].push(sq.player_id)
         }
       }
       for (const s of st || []) {
@@ -91,13 +94,14 @@ export default function LeaguePage() {
       if (allPlayerIds.length > 0) {
         const { data: scores } = await supabase
           .from('fantasy_scores')
-          .select('player_id, rating, match_date')
+          .select('player_id, rating, match_date, match_id')
           .in('player_id', allPlayerIds)
           .not('rating', 'is', null)
           .order('match_date', { ascending: false })
           .order('rating', { ascending: false })
-          .limit(100)
+          .limit(200)
 
+        // Real scored entries
         const mapped: RecentScore[] = (scores ?? []).map(sc => ({
           player_id: sc.player_id,
           player_name: playerInfoMap[sc.player_id]?.player_name ?? '',
@@ -106,7 +110,36 @@ export default function LeaguePage() {
           match_date: sc.match_date ?? '',
           participant_name: participantNameMap[playerToParticipant[sc.player_id]] ?? '',
         }))
-        setRecentScores(mapped)
+
+        // Two sets to detect already-scored players (match_id primary, date fallback)
+        const scoredByMatchId = new Set((scores ?? []).map(sc => `${sc.player_id}_${sc.match_id}`))
+        const scoredByDate = new Set((scores ?? []).filter(sc => sc.match_date).map(sc => `${sc.player_id}_${(sc.match_date as string).split('T')[0]}`))
+
+        // Zero-score entries: players whose team played but who have no score
+        type PMatch = { id: string; match_date: string; home_team: string; away_team: string }
+        const zeroEntries: RecentScore[] = []
+        for (const match of (processedMatches || []) as PMatch[]) {
+          const datePrefix = match.match_date?.split('T')[0] ?? ''
+          for (const team of [match.home_team, match.away_team]) {
+            for (const pid of teamToPlayerIds[team] ?? []) {
+              const alreadyScored = scoredByMatchId.has(`${pid}_${match.id}`) || scoredByDate.has(`${pid}_${datePrefix}`)
+              if (!alreadyScored) {
+                zeroEntries.push({
+                  player_id: pid,
+                  player_name: playerInfoMap[pid]?.player_name ?? '',
+                  team: playerInfoMap[pid]?.team ?? team,
+                  rating: 0,
+                  match_date: match.match_date,
+                  participant_name: participantNameMap[playerToParticipant[pid]] ?? '',
+                })
+              }
+            }
+          }
+        }
+
+        const combined = [...mapped, ...zeroEntries]
+        combined.sort((a, b) => b.match_date.localeCompare(a.match_date))
+        setRecentScores(combined.slice(0, 200))
       }
 
       setLoading(false)
