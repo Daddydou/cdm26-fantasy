@@ -55,14 +55,19 @@ export default function LeaguePage() {
 
       setStandings(st || [])
 
-      const teamsByParticipant: Record<string, Set<string>> = {}
-      for (const s of allSquads || []) {
-        if (!teamsByParticipant[s.participant_id]) teamsByParticipant[s.participant_id] = new Set()
-        teamsByParticipant[s.participant_id].add(s.team)
+      // Équipes ayant au moins un match joué
+      const playedTeams = new Set<string>()
+      for (const m of (processedMatches || []) as { home_team: string; away_team: string }[]) {
+        playedTeams.add(m.home_team)
+        playedTeams.add(m.away_team)
       }
+      // Nombre de joueurs actifs dont l'équipe a joué
       const counts: Record<string, number> = {}
-      for (const [pid, teams] of Object.entries(teamsByParticipant)) {
-        counts[pid] = (processedMatches || []).filter(m => teams.has(m.home_team) || teams.has(m.away_team)).length
+      for (const s of allSquads || []) {
+        const sq = s as { participant_id: string; team: string; player_id: string }
+        if (sq.player_id && playedTeams.has(sq.team)) {
+          counts[sq.participant_id] = (counts[sq.participant_id] ?? 0) + 1
+        }
       }
       setMatchCounts(counts)
 
@@ -250,7 +255,7 @@ export default function LeaguePage() {
                     <span className="text-xs text-white/30">pts</span>
                   </div>
                   <p className="text-xs text-white/30">
-                    {matchCounts[s.participant_id] ?? 0} match{(matchCounts[s.participant_id] ?? 0) > 1 ? 's' : ''}
+                    {matchCounts[s.participant_id] ?? 0} joueur{(matchCounts[s.participant_id] ?? 0) > 1 ? 's' : ''} joué{(matchCounts[s.participant_id] ?? 0) > 1 ? 's' : ''}
                   </p>
                 </div>
               </div>
