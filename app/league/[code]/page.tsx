@@ -255,7 +255,7 @@ export default function LeaguePage() {
                     <span className="text-xs text-white/30">pts</span>
                   </div>
                   <p className="text-xs text-white/30">
-                    {matchCounts[s.participant_id] ?? 0} joueur{(matchCounts[s.participant_id] ?? 0) > 1 ? 's' : ''} joué{(matchCounts[s.participant_id] ?? 0) > 1 ? 's' : ''}
+                    {matchCounts[s.participant_id] ?? 0} joueur{(matchCounts[s.participant_id] ?? 0) > 1 ? 's' : ''} ont joué
                   </p>
                 </div>
               </div>
