@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { League, Participant, Standing } from '@/lib/database.types'
 import { PHASE_LABELS } from '@/lib/pricing'
 
-type RecentScore = { player_id: string; player_name: string; team: string; rating: number; match_date: string }
+type RecentScore = { player_id: string; player_name: string; team: string; rating: number; match_date: string; participant_name: string }
 
 export default function LeaguePage() {
   const { code } = useParams<{ code: string }>()
@@ -50,7 +50,7 @@ export default function LeaguePage() {
       const [{ data: st }, { data: allSquads }, { data: processedMatches }] = await Promise.all([
         supabase.from('fantasy_standings').select().eq('league_id', lg.id).order('total_points', { ascending: false }),
         supabase.from('fantasy_squad_detail').select('participant_id, team, player_id, player_name').eq('league_id', lg.id).eq('active', true),
-        supabase.from('fantasy_matches').select('home_team, away_team').eq('processed', true),
+        supabase.from('fantasy_matches').select('id, match_date, home_team, away_team').eq('processed', true).order('match_date', { ascending: false }),
       ])
 
       setStandings(st || [])
@@ -66,36 +66,64 @@ export default function LeaguePage() {
       }
       setMatchCounts(counts)
 
-      // Build player info map and squad-by-participant for recent results section
+      // Build lookup maps for recent results section
       const playerInfoMap: Record<string, { player_name: string; team: string }> = {}
       const squadByP: Record<string, string[]> = {}
+      const playerToParticipant: Record<string, string> = {}
+      const teamToPlayerIds: Record<string, string[]> = {}
+      const participantNameMap: Record<string, string> = {}
+
       for (const s of allSquads || []) {
         const sq = s as { participant_id: string; team: string; player_id: string; player_name: string }
         if (sq.player_id) {
           playerInfoMap[sq.player_id] = { player_name: sq.player_name, team: sq.team }
+          playerToParticipant[sq.player_id] = sq.participant_id
           if (!squadByP[sq.participant_id]) squadByP[sq.participant_id] = []
           squadByP[sq.participant_id].push(sq.player_id)
+          if (!teamToPlayerIds[sq.team]) teamToPlayerIds[sq.team] = []
+          if (!teamToPlayerIds[sq.team].includes(sq.player_id)) teamToPlayerIds[sq.team].push(sq.player_id)
         }
       }
+      for (const s of st || []) {
+        participantNameMap[s.participant_id] = s.display_name
+      }
+
       const allPlayerIds = Object.keys(playerInfoMap)
       if (allPlayerIds.length > 0) {
         const { data: scores } = await supabase
           .from('fantasy_scores')
-          .select('player_id, rating, match_date')
+          .select('player_id, rating, match_id')
           .in('player_id', allPlayerIds)
-          .not('rating', 'is', null)
-          .order('match_date', { ascending: false })
-          .limit(100)
-        const mapped: RecentScore[] = (scores ?? [])
-          .filter(s => s.rating != null && s.match_date != null)
-          .map(s => ({
-            player_id: s.player_id,
-            player_name: playerInfoMap[s.player_id]?.player_name ?? '',
-            team: playerInfoMap[s.player_id]?.team ?? '',
-            rating: s.rating as number,
-            match_date: s.match_date as string,
-          }))
-        setRecentScores(mapped)
+
+        // player_id + match_id → rating (null means no rating stored)
+        const scoreMap = new Map<string, number | null>()
+        for (const sc of scores ?? []) {
+          scoreMap.set(`${sc.player_id}_${sc.match_id}`, sc.rating)
+        }
+
+        type PMatch = { id: string; match_date: string; home_team: string; away_team: string }
+        const allEntries: RecentScore[] = []
+        for (const match of (processedMatches || []) as PMatch[]) {
+          for (const team of [match.home_team, match.away_team]) {
+            for (const pid of teamToPlayerIds[team] ?? []) {
+              const key = `${pid}_${match.id}`
+              const raw = scoreMap.has(key) ? scoreMap.get(key) : null
+              allEntries.push({
+                player_id: pid,
+                player_name: playerInfoMap[pid]?.player_name ?? '',
+                team: playerInfoMap[pid]?.team ?? team,
+                rating: raw ?? 0,
+                match_date: match.match_date,
+                participant_name: participantNameMap[playerToParticipant[pid]] ?? '',
+              })
+            }
+          }
+        }
+
+        // processedMatches is already ordered desc; re-sort to be safe
+        allEntries.sort((a, b) => b.match_date.localeCompare(a.match_date))
+
+        setRecentScores(allEntries.slice(0, 300))
         setSquadPlayerIds(squadByP)
       }
 
@@ -209,11 +237,12 @@ export default function LeaguePage() {
             <select
               value={selectedParticipant}
               onChange={e => setSelectedParticipant(e.target.value)}
-              className="text-xs bg-white/5 text-white/70 border border-white/10 rounded px-2 py-1 focus:outline-none"
+              className="text-xs text-white border border-white/10 rounded px-2 py-1 focus:outline-none"
+              style={{ backgroundColor: '#1e1e2e' }}
             >
-              <option value="all">Tous</option>
+              <option value="all" style={{ backgroundColor: '#1e1e2e', color: 'white' }}>Tous</option>
               {standings.map(s => (
-                <option key={s.participant_id} value={s.participant_id}>{s.display_name}</option>
+                <option key={s.participant_id} value={s.participant_id} style={{ backgroundColor: '#1e1e2e', color: 'white' }}>{s.display_name}</option>
               ))}
             </select>
           </div>
@@ -225,7 +254,7 @@ export default function LeaguePage() {
               <div key={`${s.player_id}-${s.match_date}-${i}`} className="flex items-center gap-3 px-4 py-2.5 border-b border-white/5 last:border-0">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-white truncate">{s.player_name}</p>
-                  <p className="text-xs text-white/40">{s.team}</p>
+                  <p className="text-xs text-white/40">{s.team} · <span className="text-brand-400/70">{s.participant_name}</span></p>
                 </div>
                 <div className="text-right flex-shrink-0">
                   <p className={`text-sm font-bold ${s.rating >= 7 ? 'text-green-400' : s.rating >= 6 ? 'text-orange-400' : 'text-red-400'}`}>
