@@ -92,22 +92,26 @@ export default function LeaguePage() {
       if (allPlayerIds.length > 0) {
         const { data: scores } = await supabase
           .from('fantasy_scores')
-          .select('player_id, rating, match_id')
+          .select('player_id, rating, match_id, match_date')
           .in('player_id', allPlayerIds)
 
-        // player_id + match_id → rating (null means no rating stored)
-        const scoreMap = new Map<string, number | null>()
+        // Two lookup maps: by match_id (UUID) and by match_date (YYYY-MM-DD fallback)
+        const scoreByMatchId = new Map<string, number | null>()
+        const scoreByDate = new Map<string, number | null>()
         for (const sc of scores ?? []) {
-          scoreMap.set(`${sc.player_id}_${sc.match_id}`, sc.rating)
+          if (sc.match_id) scoreByMatchId.set(`${sc.player_id}_${sc.match_id}`, sc.rating)
+          if (sc.match_date) scoreByDate.set(`${sc.player_id}_${sc.match_date.substring(0, 10)}`, sc.rating)
         }
 
         type PMatch = { id: string; match_date: string; home_team: string; away_team: string }
         const allEntries: RecentScore[] = []
         for (const match of (processedMatches || []) as PMatch[]) {
+          const datePrefix = match.match_date?.substring(0, 10) ?? ''
           for (const team of [match.home_team, match.away_team]) {
             for (const pid of teamToPlayerIds[team] ?? []) {
-              const key = `${pid}_${match.id}`
-              const raw = scoreMap.has(key) ? scoreMap.get(key) : null
+              const byId = scoreByMatchId.has(`${pid}_${match.id}`) ? scoreByMatchId.get(`${pid}_${match.id}`) : undefined
+              const byDate = scoreByDate.has(`${pid}_${datePrefix}`) ? scoreByDate.get(`${pid}_${datePrefix}`) : undefined
+              const raw = byId !== undefined ? byId : byDate !== undefined ? byDate : null
               allEntries.push({
                 player_id: pid,
                 player_name: playerInfoMap[pid]?.player_name ?? '',
@@ -120,9 +124,7 @@ export default function LeaguePage() {
           }
         }
 
-        // processedMatches is already ordered desc; re-sort to be safe
         allEntries.sort((a, b) => b.match_date.localeCompare(a.match_date))
-
         setRecentScores(allEntries.slice(0, 300))
         setSquadPlayerIds(squadByP)
       }
