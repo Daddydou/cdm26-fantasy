@@ -95,44 +95,71 @@ export default function LeaguePage() {
 
       const allPlayerIds = Object.keys(playerInfoMap)
       if (allPlayerIds.length > 0) {
-        // Tous les scores pour les joueurs de la ligue (sans limite pour la complétude)
+        // 1. Vraies notes depuis fantasy_scores, triées par date desc
         const { data: scores } = await supabase
           .from('fantasy_scores')
-          .select('player_id, rating, match_id')
+          .select('player_id, rating, match_date')
           .in('player_id', allPlayerIds)
           .not('rating', 'is', null)
+          .order('match_date', { ascending: false })
+          .order('rating', { ascending: false })
+          .limit(100)
 
-        // player_id + match_id (UUID) → rating
-        const scoreMap = new Map<string, number>()
+        const ownerNames = (pid: string) =>
+          (playerToParticipants[pid] ?? []).map(id => participantNameMap[id] ?? '').filter(Boolean).join(', ')
+
+        const realEntries: RecentScore[] = (scores ?? []).map(sc => ({
+          player_id: sc.player_id,
+          player_name: playerInfoMap[sc.player_id]?.player_name ?? '',
+          team: playerInfoMap[sc.player_id]?.team ?? '',
+          rating: sc.rating as number,
+          match_date: sc.match_date ?? '',
+          participant_name: ownerNames(sc.player_id),
+        }))
+
+        // 2. Set des joueurs déjà notés : player_id + YYYY-MM-DD (côté scores)
+        //    On marque aussi le jour d'avant pour absorber le décalage UTC/heure locale
+        const scoredSet = new Set<string>()
         for (const sc of scores ?? []) {
-          if (sc.match_id && sc.rating != null) scoreMap.set(`${sc.player_id}_${sc.match_id}`, sc.rating)
+          if (!sc.match_date) continue
+          const d = sc.match_date.split('T')[0]
+          scoredSet.add(`${sc.player_id}_${d}`)
+          const prev = new Date(new Date(d + 'T12:00:00Z').getTime() - 864e5).toISOString().split('T')[0]
+          scoredSet.add(`${sc.player_id}_${prev}`)
         }
 
-        // Un seul enregistrement par joueur par match, note réelle ou 0
+        // 3. Entrées à 0 : joueurs pickés dont l'équipe a joué mais sans note
         type PMatch = { id: string; match_date: string; home_team: string; away_team: string }
-        const entries: RecentScore[] = []
+        const zeroEntries: RecentScore[] = []
         for (const match of (processedMatches || []) as PMatch[]) {
+          const datePrefix = match.match_date?.split('T')[0] ?? ''
           for (const team of [match.home_team, match.away_team]) {
             for (const pid of teamToPlayerIds[team] ?? []) {
-              const rating = scoreMap.get(`${pid}_${match.id}`) ?? 0
-              const ownerNames = (playerToParticipants[pid] ?? [])
-                .map(id => participantNameMap[id] ?? '')
-                .filter(Boolean)
-                .join(', ')
-              entries.push({
-                player_id: pid,
-                player_name: playerInfoMap[pid]?.player_name ?? '',
-                team: playerInfoMap[pid]?.team ?? team,
-                rating,
-                match_date: match.match_date,
-                participant_name: ownerNames,
-              })
+              if (!scoredSet.has(`${pid}_${datePrefix}`)) {
+                zeroEntries.push({
+                  player_id: pid,
+                  player_name: playerInfoMap[pid]?.player_name ?? '',
+                  team: playerInfoMap[pid]?.team ?? team,
+                  rating: 0,
+                  match_date: match.match_date,
+                  participant_name: ownerNames(pid),
+                })
+              }
             }
           }
         }
 
-        entries.sort((a, b) => b.match_date.localeCompare(a.match_date))
-        setRecentScores(entries.slice(0, 200))
+        // 4. Fusion, déduplification par player_id + YYYY-MM-DD (les vraies notes en premier)
+        const combined = [...realEntries, ...zeroEntries]
+        combined.sort((a, b) => b.match_date.localeCompare(a.match_date))
+        const seen = new Set<string>()
+        const deduped = combined.filter(e => {
+          const key = `${e.player_id}_${(e.match_date || '').split('T')[0]}`
+          if (seen.has(key)) return false
+          seen.add(key)
+          return true
+        })
+        setRecentScores(deduped.slice(0, 200))
       }
 
       setLoading(false)
