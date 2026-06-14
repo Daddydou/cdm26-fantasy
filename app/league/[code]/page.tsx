@@ -125,6 +125,10 @@ export default function LeaguePage() {
         }
 
         allEntries.sort((a, b) => b.match_date.localeCompare(a.match_date))
+        console.log('[recent] scores chargés:', allEntries.length)
+        allEntries.slice(0, 3).forEach(e => {
+          console.log('[recent] joueur:', e.player_name, 'match_date:', e.match_date, 'score trouvé:', e.rating)
+        })
         setRecentScores(allEntries.slice(0, 300))
         setSquadPlayerIds(squadByP)
       }
