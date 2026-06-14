@@ -50,6 +50,11 @@ const PLAYER_ALIASES: Record<string, string> = {
   'Lee Gi-Hyuk': 'Lee Gi-hyuk',
 }
 
+// Alias conditionnels : s'appliquent uniquement si l'équipe (clé FR) correspond
+const PLAYER_ALIASES_BY_TEAM: Record<string, Record<string, string>> = {
+  'Brésil': { 'Gabriel': 'Gabriel Magalhães' },
+}
+
 function normalize(s: string) {
   // eslint-disable-next-line no-misleading-character-class
   return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/-/g, ' ').trim()
@@ -247,7 +252,10 @@ export async function POST(req: NextRequest) {
     for (const p of m.players) {
       if (p.rating == null) continue
       const frTeam = TEAM_MAP[p.team] ?? p.team
-      const resolvedName = PLAYER_ALIASES[p.name] ?? p.name
+      const resolvedName =
+        PLAYER_ALIASES_BY_TEAM[frTeam]?.[p.name] ??
+        PLAYER_ALIASES[p.name] ??
+        p.name
       const player = findPlayer(resolvedName, frTeam)
       if (logCount < 5) {
         console.log('[import] joueur:', p.name, resolvedName !== p.name ? `(alias→${resolvedName})` : '', '→ normalisé:', normalize(resolvedName), 'match:', player?.name ?? 'NON TROUVÉ')
