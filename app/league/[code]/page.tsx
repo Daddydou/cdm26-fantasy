@@ -7,6 +7,8 @@ import { supabase } from '@/lib/supabase'
 import { League, Participant, Standing } from '@/lib/database.types'
 import { PHASE_LABELS } from '@/lib/pricing'
 
+type RecentScore = { player_id: string; player_name: string; team: string; rating: number; match_date: string }
+
 export default function LeaguePage() {
   const { code } = useParams<{ code: string }>()
   const router = useRouter()
@@ -16,6 +18,9 @@ export default function LeaguePage() {
   const [matchCounts, setMatchCounts] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [recentScores, setRecentScores] = useState<RecentScore[]>([])
+  const [squadPlayerIds, setSquadPlayerIds] = useState<Record<string, string[]>>({})
+  const [selectedParticipant, setSelectedParticipant] = useState('all')
 
   useEffect(() => {
     async function load() {
@@ -44,7 +49,7 @@ export default function LeaguePage() {
 
       const [{ data: st }, { data: allSquads }, { data: processedMatches }] = await Promise.all([
         supabase.from('fantasy_standings').select().eq('league_id', lg.id).order('total_points', { ascending: false }),
-        supabase.from('fantasy_squad_detail').select('participant_id, team').eq('league_id', lg.id).eq('active', true),
+        supabase.from('fantasy_squad_detail').select('participant_id, team, player_id, player_name').eq('league_id', lg.id).eq('active', true),
         supabase.from('fantasy_matches').select('home_team, away_team').eq('processed', true),
       ])
 
@@ -60,6 +65,39 @@ export default function LeaguePage() {
         counts[pid] = (processedMatches || []).filter(m => teams.has(m.home_team) || teams.has(m.away_team)).length
       }
       setMatchCounts(counts)
+
+      // Build player info map and squad-by-participant for recent results section
+      const playerInfoMap: Record<string, { player_name: string; team: string }> = {}
+      const squadByP: Record<string, string[]> = {}
+      for (const s of allSquads || []) {
+        const sq = s as { participant_id: string; team: string; player_id: string; player_name: string }
+        if (sq.player_id) {
+          playerInfoMap[sq.player_id] = { player_name: sq.player_name, team: sq.team }
+          if (!squadByP[sq.participant_id]) squadByP[sq.participant_id] = []
+          squadByP[sq.participant_id].push(sq.player_id)
+        }
+      }
+      const allPlayerIds = Object.keys(playerInfoMap)
+      if (allPlayerIds.length > 0) {
+        const { data: scores } = await supabase
+          .from('fantasy_scores')
+          .select('player_id, rating, match_date')
+          .in('player_id', allPlayerIds)
+          .not('rating', 'is', null)
+          .order('match_date', { ascending: false })
+          .limit(100)
+        const mapped: RecentScore[] = (scores ?? [])
+          .filter(s => s.rating != null && s.match_date != null)
+          .map(s => ({
+            player_id: s.player_id,
+            player_name: playerInfoMap[s.player_id]?.player_name ?? '',
+            team: playerInfoMap[s.player_id]?.team ?? '',
+            rating: s.rating as number,
+            match_date: s.match_date as string,
+          }))
+        setRecentScores(mapped)
+        setSquadPlayerIds(squadByP)
+      }
 
       setLoading(false)
     }
@@ -160,6 +198,46 @@ export default function LeaguePage() {
               Voir tout le classement →
             </Link>
           )}
+        </div>
+      )}
+
+      {/* Derniers résultats */}
+      {recentScores.length > 0 && (
+        <div className="card mb-6">
+          <div className="p-4 border-b border-white/5 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold text-white">Derniers résultats</h2>
+            <select
+              value={selectedParticipant}
+              onChange={e => setSelectedParticipant(e.target.value)}
+              className="text-xs bg-white/5 text-white/70 border border-white/10 rounded px-2 py-1 focus:outline-none"
+            >
+              <option value="all">Tous</option>
+              {standings.map(s => (
+                <option key={s.participant_id} value={s.participant_id}>{s.display_name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            {(selectedParticipant === 'all'
+              ? recentScores.slice(0, 10)
+              : recentScores.filter(s => (squadPlayerIds[selectedParticipant] ?? []).includes(s.player_id)).slice(0, 10)
+            ).map((s, i) => (
+              <div key={`${s.player_id}-${s.match_date}-${i}`} className="flex items-center gap-3 px-4 py-2.5 border-b border-white/5 last:border-0">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-white truncate">{s.player_name}</p>
+                  <p className="text-xs text-white/40">{s.team}</p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className={`text-sm font-bold ${s.rating >= 7 ? 'text-green-400' : s.rating >= 6 ? 'text-orange-400' : 'text-red-400'}`}>
+                    {s.rating.toFixed(1)} pts
+                  </p>
+                  <p className="text-xs text-white/40">
+                    {new Date(s.match_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
