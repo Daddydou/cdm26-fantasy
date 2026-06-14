@@ -103,12 +103,20 @@ export default function LeaguePage() {
           if (sc.match_date) scoreByDate.set(`${sc.player_id}_${sc.match_date.split('T')[0]}`, sc.rating)
         }
 
+        console.log('[recent] scoreByMatchId keys (5 premiers):', Array.from(scoreByMatchId.keys()).slice(0, 5))
+        console.log('[recent] scoreByDate keys (5 premiers):', Array.from(scoreByDate.keys()).slice(0, 5))
+
         type PMatch = { id: string; match_date: string; home_team: string; away_team: string }
         const allEntries: RecentScore[] = []
+        let debugCount = 0
         for (const match of (processedMatches || []) as PMatch[]) {
           const datePrefix = match.match_date?.split('T')[0] ?? ''
           for (const team of [match.home_team, match.away_team]) {
             for (const pid of teamToPlayerIds[team] ?? []) {
+              if (debugCount < 3) {
+                console.log('[recent] clé cherchée par date:', `${pid}_${datePrefix}`)
+                debugCount++
+              }
               const byId = scoreByMatchId.has(`${pid}_${match.id}`) ? scoreByMatchId.get(`${pid}_${match.id}`) : undefined
               const byDate = scoreByDate.has(`${pid}_${datePrefix}`) ? scoreByDate.get(`${pid}_${datePrefix}`) : undefined
               const raw = byId !== undefined ? byId : byDate !== undefined ? byDate : null
