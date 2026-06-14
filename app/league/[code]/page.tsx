@@ -100,13 +100,13 @@ export default function LeaguePage() {
         const scoreByDate = new Map<string, number | null>()
         for (const sc of scores ?? []) {
           if (sc.match_id) scoreByMatchId.set(`${sc.player_id}_${sc.match_id}`, sc.rating)
-          if (sc.match_date) scoreByDate.set(`${sc.player_id}_${sc.match_date.substring(0, 10)}`, sc.rating)
+          if (sc.match_date) scoreByDate.set(`${sc.player_id}_${sc.match_date.split('T')[0]}`, sc.rating)
         }
 
         type PMatch = { id: string; match_date: string; home_team: string; away_team: string }
         const allEntries: RecentScore[] = []
         for (const match of (processedMatches || []) as PMatch[]) {
-          const datePrefix = match.match_date?.substring(0, 10) ?? ''
+          const datePrefix = match.match_date?.split('T')[0] ?? ''
           for (const team of [match.home_team, match.away_team]) {
             for (const pid of teamToPlayerIds[team] ?? []) {
               const byId = scoreByMatchId.has(`${pid}_${match.id}`) ? scoreByMatchId.get(`${pid}_${match.id}`) : undefined
