@@ -69,7 +69,7 @@ export default function LeaguePage() {
       // Build lookup maps for recent results section
       const playerInfoMap: Record<string, { player_name: string; team: string }> = {}
       const squadByP: Record<string, string[]> = {}
-      const playerToParticipant: Record<string, string> = {}
+      const playerToParticipants: Record<string, string[]> = {}
       const participantNameMap: Record<string, string> = {}
       const teamToPlayerIds: Record<string, string[]> = {}
 
@@ -77,9 +77,12 @@ export default function LeaguePage() {
         const sq = s as { participant_id: string; team: string; player_id: string; player_name: string }
         if (sq.player_id) {
           playerInfoMap[sq.player_id] = { player_name: sq.player_name, team: sq.team }
-          playerToParticipant[sq.player_id] = sq.participant_id
+          if (!playerToParticipants[sq.player_id]) playerToParticipants[sq.player_id] = []
+          if (!playerToParticipants[sq.player_id].includes(sq.participant_id))
+            playerToParticipants[sq.player_id].push(sq.participant_id)
           if (!squadByP[sq.participant_id]) squadByP[sq.participant_id] = []
-          squadByP[sq.participant_id].push(sq.player_id)
+          if (!squadByP[sq.participant_id].includes(sq.player_id))
+            squadByP[sq.participant_id].push(sq.player_id)
           if (!teamToPlayerIds[sq.team]) teamToPlayerIds[sq.team] = []
           if (!teamToPlayerIds[sq.team].includes(sq.player_id)) teamToPlayerIds[sq.team].push(sq.player_id)
         }
@@ -92,54 +95,44 @@ export default function LeaguePage() {
 
       const allPlayerIds = Object.keys(playerInfoMap)
       if (allPlayerIds.length > 0) {
+        // Tous les scores pour les joueurs de la ligue (sans limite pour la complétude)
         const { data: scores } = await supabase
           .from('fantasy_scores')
-          .select('player_id, rating, match_date, match_id')
+          .select('player_id, rating, match_id')
           .in('player_id', allPlayerIds)
           .not('rating', 'is', null)
-          .order('match_date', { ascending: false })
-          .order('rating', { ascending: false })
-          .limit(200)
 
-        // Real scored entries
-        const mapped: RecentScore[] = (scores ?? []).map(sc => ({
-          player_id: sc.player_id,
-          player_name: playerInfoMap[sc.player_id]?.player_name ?? '',
-          team: playerInfoMap[sc.player_id]?.team ?? '',
-          rating: sc.rating as number,
-          match_date: sc.match_date ?? '',
-          participant_name: participantNameMap[playerToParticipant[sc.player_id]] ?? '',
-        }))
+        // player_id + match_id (UUID) → rating
+        const scoreMap = new Map<string, number>()
+        for (const sc of scores ?? []) {
+          if (sc.match_id && sc.rating != null) scoreMap.set(`${sc.player_id}_${sc.match_id}`, sc.rating)
+        }
 
-        // Two sets to detect already-scored players (match_id primary, date fallback)
-        const scoredByMatchId = new Set((scores ?? []).map(sc => `${sc.player_id}_${sc.match_id}`))
-        const scoredByDate = new Set((scores ?? []).filter(sc => sc.match_date).map(sc => `${sc.player_id}_${(sc.match_date as string).split('T')[0]}`))
-
-        // Zero-score entries: players whose team played but who have no score
+        // Un seul enregistrement par joueur par match, note réelle ou 0
         type PMatch = { id: string; match_date: string; home_team: string; away_team: string }
-        const zeroEntries: RecentScore[] = []
+        const entries: RecentScore[] = []
         for (const match of (processedMatches || []) as PMatch[]) {
-          const datePrefix = match.match_date?.split('T')[0] ?? ''
           for (const team of [match.home_team, match.away_team]) {
             for (const pid of teamToPlayerIds[team] ?? []) {
-              const alreadyScored = scoredByMatchId.has(`${pid}_${match.id}`) || scoredByDate.has(`${pid}_${datePrefix}`)
-              if (!alreadyScored) {
-                zeroEntries.push({
-                  player_id: pid,
-                  player_name: playerInfoMap[pid]?.player_name ?? '',
-                  team: playerInfoMap[pid]?.team ?? team,
-                  rating: 0,
-                  match_date: match.match_date,
-                  participant_name: participantNameMap[playerToParticipant[pid]] ?? '',
-                })
-              }
+              const rating = scoreMap.get(`${pid}_${match.id}`) ?? 0
+              const ownerNames = (playerToParticipants[pid] ?? [])
+                .map(id => participantNameMap[id] ?? '')
+                .filter(Boolean)
+                .join(', ')
+              entries.push({
+                player_id: pid,
+                player_name: playerInfoMap[pid]?.player_name ?? '',
+                team: playerInfoMap[pid]?.team ?? team,
+                rating,
+                match_date: match.match_date,
+                participant_name: ownerNames,
+              })
             }
           }
         }
 
-        const combined = [...mapped, ...zeroEntries]
-        combined.sort((a, b) => b.match_date.localeCompare(a.match_date))
-        setRecentScores(combined.slice(0, 200))
+        entries.sort((a, b) => b.match_date.localeCompare(a.match_date))
+        setRecentScores(entries.slice(0, 200))
       }
 
       setLoading(false)
