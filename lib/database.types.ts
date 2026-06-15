@@ -11,6 +11,7 @@ export type Phase =
   | 'apres_quart'
   | 'demi'
   | 'apres_demi'
+  | 'finale_3eme'
   | 'finale'
   | 'termine'
 export type PricePhase = 'initial' | 'post_poule' | 'post_8' | 'post_quart' | 'post_demi'
@@ -111,9 +112,10 @@ export type Database = {
           away_team: string
           match_date: string
           processed: boolean
+          points_multiplier: number
           created_at: string
         }
-        Insert: Omit<Database['public']['Tables']['fantasy_matches']['Row'], 'id' | 'created_at'>
+        Insert: Omit<Database['public']['Tables']['fantasy_matches']['Row'], 'id' | 'created_at' | 'points_multiplier'> & { points_multiplier?: number }
         Update: Partial<Database['public']['Tables']['fantasy_matches']['Insert']>
       }
       fantasy_scores: {

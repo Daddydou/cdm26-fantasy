@@ -58,6 +58,7 @@ export const PHASE_LABELS: Record<string, string> = {
   apres_quart:    'Après 1/4',
   demi:           'Demi-finales',
   apres_demi:     'Après demies',
+  finale_3eme:    '3e / 4e place',
   finale:         'Finale',
   termine:        'Terminé',
 }

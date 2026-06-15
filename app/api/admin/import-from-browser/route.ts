@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js'
 
 const ALLOWED_ORIGINS = new Set([
   'https://www.sofascore.com',
+  'https://www.flashscore.fr',
+  'https://flashscore.fr',
   'http://localhost:3000',
   'http://localhost:3001',
 ])
@@ -30,13 +32,13 @@ const TEAM_MAP: Record<string, string> = {
   Uruguay: 'Uruguay', Switzerland: 'Suisse', Norway: 'Norvège',
   'South Korea': 'Corée du Sud', Poland: 'Pologne', Austria: 'Autriche',
   Turkey: 'Turquie', Scotland: 'Ecosse',
-  'Czech Republic': 'Rép. Tchèque', 'Tchéquie': 'Rép. Tchèque', 'République Tchèque': 'Rép. Tchèque',
+  'Czech Republic': 'Rép. Tchèque', 'Tchéquie': 'Rép. Tchèque', 'République Tchèque': 'Rép. Tchèque', 'République tchèque': 'Rép. Tchèque',
   Serbia: 'Serbie', Ghana: 'Ghana', Iran: 'Iran', Qatar: 'Qatar',
   Ecuador: 'Équateur', Colombia: 'Colombie', Canada: 'Canada',
-  Mexico: 'Mexique', USA: 'Etats-Unis', 'United States': 'Etats-Unis',
+  Mexico: 'Mexique', USA: 'Etats-Unis', 'United States': 'Etats-Unis', 'États-Unis': 'Etats-Unis', 'Etats-Unis': 'Etats-Unis',
   Senegal: 'Sénégal', Morocco: 'Maroc',
   'Ivory Coast': "Côte d'Ivoire", 'Bosnie-Herzégovine': 'Bosnie-Herzégovine',
-  Algeria: 'Algerie', Egypt: 'Egypte', Japan: 'Japon', Australia: 'Australie',
+  Algeria: 'Algerie', 'Algérie': 'Algerie', Egypt: 'Egypte', 'Égypte': 'Egypte', Japan: 'Japon', Australia: 'Australie',
   'South Africa': 'Afrique du Sud', Georgia: 'Géorgie', Bosnia: 'Bosnie',
   'DR Congo': 'RD Congo', Tunisia: 'Tunisie', Uzbekistan: 'Ouzbekistan',
   Jordan: 'Jordanie', 'New Zealand': 'Nouvelle-Zélande', Iraq: 'Irak',
