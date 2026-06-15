@@ -57,29 +57,21 @@ export default function StandingsPage() {
       const { data: st } = await supabase.from('fantasy_standings').select().eq('league_id', lg.id)
       setStandings(st || [])
 
-      const participantIds = (st || []).map(s => s.participant_id)
-
-      const [{ data: squadDetail }, { data: squadsWithDates }, { data: allPlayedMatches }, predictionsRes] = await Promise.all([
-        supabase.from('fantasy_squad_detail').select('player_id, team').eq('league_id', lg.id).eq('active', true),
-        supabase.from('fantasy_squads').select('player_id, participant_id, created_at').in('participant_id', participantIds).eq('active', true),
-        supabase.from('fantasy_matches').select('home_team, away_team, match_date').lt('match_date', new Date().toISOString()),
+      const [nationMatchesRes, predictionsRes] = await Promise.all([
+        fetch(`/api/league/${code}/nation-matches`, {
+          headers: { Authorization: `Bearer ${session?.access_token ?? ''}` },
+        }).catch(() => null),
         fetch(`/api/league/${code}/predictions`, {
           headers: { Authorization: `Bearer ${session?.access_token ?? ''}` },
         }).catch(() => null),
       ])
 
-      const playerTeamMap: Record<string, string> = {}
-      for (const s of (squadDetail || [])) playerTeamMap[s.player_id] = s.team
-
       const nmMap: Record<string, number> = {}
-      for (const sq of (squadsWithDates || []) as { player_id: string; participant_id: string; created_at: string }[]) {
-        const team = playerTeamMap[sq.player_id]
-        if (!team) continue
-        for (const m of (allPlayedMatches || []) as { home_team: string; away_team: string; match_date: string }[]) {
-          if ((m.home_team === team || m.away_team === team) && m.match_date >= sq.created_at) {
-            nmMap[sq.participant_id] = (nmMap[sq.participant_id] ?? 0) + 1
-          }
-        }
+      if (nationMatchesRes?.ok) {
+        try {
+          const { nationMatches } = await nationMatchesRes.json()
+          for (const [pid, count] of Object.entries(nationMatches || {})) nmMap[pid] = count as number
+        } catch { /* ignore */ }
       }
       setNationMatchesMap(nmMap)
 
