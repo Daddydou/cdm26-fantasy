@@ -15,7 +15,8 @@ export default function LeaguePage() {
   const [league, setLeague] = useState<League | null>(null)
   const [me, setMe] = useState<Participant | null>(null)
   const [standings, setStandings] = useState<Standing[]>([])
-  const [matchCounts, setMatchCounts] = useState<Record<string, number>>({})
+  const [nationMatchesMap, setNationMatchesMap] = useState<Record<string, number>>({})
+  const [winPctMap, setWinPctMap] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
   const [recentScores, setRecentScores] = useState<RecentScore[]>([])
@@ -24,7 +25,10 @@ export default function LeaguePage() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
+      const [{ data: { user } }, { data: { session } }] = await Promise.all([
+        supabase.auth.getUser(),
+        supabase.auth.getSession(),
+      ])
       if (!user) { router.push('/'); return }
 
       const { data: lg } = await supabase
@@ -55,21 +59,50 @@ export default function LeaguePage() {
 
       setStandings(st || [])
 
-      // Équipes ayant au moins un match joué
+      const participantIds = (st || []).map(s => s.participant_id)
+
+      const [{ data: squadsWithDates }, { data: allPlayedMatches }, predictionsRes] = await Promise.all([
+        supabase.from('fantasy_squads').select('player_id, participant_id, created_at').in('participant_id', participantIds).eq('active', true),
+        supabase.from('fantasy_matches').select('home_team, away_team, match_date').lt('match_date', new Date().toISOString()),
+        fetch(`/api/league/${code}/predictions`, {
+          headers: { Authorization: `Bearer ${session?.access_token ?? ''}` },
+        }).catch(() => null),
+      ])
+
+      // Matchs joués par nation depuis la date d'achat
+      const playerTeamMap: Record<string, string> = {}
+      for (const s of allSquads || []) {
+        const sq = s as { player_id: string; team: string }
+        if (sq.player_id) playerTeamMap[sq.player_id] = sq.team
+      }
+      const nmMap: Record<string, number> = {}
+      for (const sq of (squadsWithDates || []) as { player_id: string; participant_id: string; created_at: string }[]) {
+        const team = playerTeamMap[sq.player_id]
+        if (!team) continue
+        for (const m of (allPlayedMatches || []) as { home_team: string; away_team: string; match_date: string }[]) {
+          if ((m.home_team === team || m.away_team === team) && m.match_date >= sq.created_at) {
+            nmMap[sq.participant_id] = (nmMap[sq.participant_id] ?? 0) + 1
+          }
+        }
+      }
+      setNationMatchesMap(nmMap)
+
+      // Prédiction de victoire
+      const wMap: Record<string, number> = {}
+      if (predictionsRes?.ok) {
+        try {
+          const { predictions } = await predictionsRes.json()
+          for (const p of (predictions || [])) wMap[p.participant_id] = p.win_pct
+        } catch { /* ignore */ }
+      }
+      setWinPctMap(wMap)
+
+      // Équipes ayant au moins un match joué (pour les résultats récents)
       const playedTeams = new Set<string>()
       for (const m of (processedMatches || []) as { home_team: string; away_team: string }[]) {
         playedTeams.add(m.home_team)
         playedTeams.add(m.away_team)
       }
-      // Nombre de joueurs actifs dont l'équipe a joué
-      const counts: Record<string, number> = {}
-      for (const s of allSquads || []) {
-        const sq = s as { participant_id: string; team: string; player_id: string }
-        if (sq.player_id && playedTeams.has(sq.team)) {
-          counts[sq.participant_id] = (counts[sq.participant_id] ?? 0) + 1
-        }
-      }
-      setMatchCounts(counts)
 
       // Build lookup maps for recent results section
       const playerInfoMap: Record<string, { player_name: string; team: string }> = {}
@@ -255,7 +288,9 @@ export default function LeaguePage() {
                     <span className="text-xs text-white/30">pts</span>
                   </div>
                   <p className="text-xs text-white/30">
-                    {matchCounts[s.participant_id] ?? 0} joueur{(matchCounts[s.participant_id] ?? 0) > 1 ? 's' : ''} ont joué
+                    {nationMatchesMap[s.participant_id] ?? 0} m
+                    {' · '}{Number(s.value_for_money).toFixed(1)} vfm
+                    {' · '}{(winPctMap[s.participant_id] ?? 0).toFixed(1)}%
                   </p>
                 </div>
               </div>

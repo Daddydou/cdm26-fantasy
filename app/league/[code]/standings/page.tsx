@@ -34,10 +34,15 @@ export default function StandingsPage() {
   const [squadData, setSquadData] = useState<SquadPlayer[]>([])
   const [squadLoading, setSquadLoading] = useState(false)
   const [viewingName, setViewingName] = useState('')
+  const [nationMatchesMap, setNationMatchesMap] = useState<Record<string, number>>({})
+  const [winPctMap, setWinPctMap] = useState<Record<string, number>>({})
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
+      const [{ data: { user } }, { data: { session } }] = await Promise.all([
+        supabase.auth.getUser(),
+        supabase.auth.getSession(),
+      ])
       if (!user) { router.push('/'); return }
 
       const { data: lg } = await supabase.from('fantasy_leagues').select().eq('code', code).single()
@@ -51,6 +56,42 @@ export default function StandingsPage() {
 
       const { data: st } = await supabase.from('fantasy_standings').select().eq('league_id', lg.id)
       setStandings(st || [])
+
+      const participantIds = (st || []).map(s => s.participant_id)
+
+      const [{ data: squadDetail }, { data: squadsWithDates }, { data: allPlayedMatches }, predictionsRes] = await Promise.all([
+        supabase.from('fantasy_squad_detail').select('player_id, team').eq('league_id', lg.id).eq('active', true),
+        supabase.from('fantasy_squads').select('player_id, participant_id, created_at').in('participant_id', participantIds).eq('active', true),
+        supabase.from('fantasy_matches').select('home_team, away_team, match_date').lt('match_date', new Date().toISOString()),
+        fetch(`/api/league/${code}/predictions`, {
+          headers: { Authorization: `Bearer ${session?.access_token ?? ''}` },
+        }).catch(() => null),
+      ])
+
+      const playerTeamMap: Record<string, string> = {}
+      for (const s of (squadDetail || [])) playerTeamMap[s.player_id] = s.team
+
+      const nmMap: Record<string, number> = {}
+      for (const sq of (squadsWithDates || []) as { player_id: string; participant_id: string; created_at: string }[]) {
+        const team = playerTeamMap[sq.player_id]
+        if (!team) continue
+        for (const m of (allPlayedMatches || []) as { home_team: string; away_team: string; match_date: string }[]) {
+          if ((m.home_team === team || m.away_team === team) && m.match_date >= sq.created_at) {
+            nmMap[sq.participant_id] = (nmMap[sq.participant_id] ?? 0) + 1
+          }
+        }
+      }
+      setNationMatchesMap(nmMap)
+
+      const wMap: Record<string, number> = {}
+      if (predictionsRes?.ok) {
+        try {
+          const { predictions } = await predictionsRes.json()
+          for (const pred of (predictions || [])) wMap[pred.participant_id] = pred.win_pct
+        } catch { /* ignore */ }
+      }
+      setWinPctMap(wMap)
+
       setLoading(false)
     }
     load()
@@ -139,14 +180,23 @@ export default function StandingsPage() {
                   {s.display_name}
                   {isMe && <span className="text-white/30 ml-1 font-normal">(toi)</span>}
                 </span>
-                <span className="text-sm font-bold text-white">
-                  {tab === 'pts'
-                    ? Number(s.total_points).toFixed(1)
-                    : Number(s.value_for_money).toFixed(2)
-                  }
-                </span>
-                <span className="text-xs text-white/30">{tab === 'pts' ? 'pts' : 'vfm'}</span>
-                <span className="text-white/30 text-xs">{marketIsOpen ? '🔒' : isViewing ? '▲' : '▼'}</span>
+                <div className="text-right flex-shrink-0">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-sm font-bold text-white">
+                      {tab === 'pts'
+                        ? Number(s.total_points).toFixed(1)
+                        : Number(s.value_for_money).toFixed(2)
+                      }
+                    </span>
+                    <span className="text-xs text-white/30">{tab === 'pts' ? 'pts' : 'vfm'}</span>
+                  </div>
+                  <p className="text-xs text-white/30">
+                    {nationMatchesMap[s.participant_id] ?? 0} m
+                    {' · '}{Number(s.value_for_money).toFixed(1)} vfm
+                    {' · '}{(winPctMap[s.participant_id] ?? 0).toFixed(1)}%
+                  </p>
+                </div>
+                <span className="text-white/30 text-xs flex-shrink-0">{marketIsOpen ? '🔒' : isViewing ? '▲' : '▼'}</span>
               </div>
 
               {/* Squad expandable */}
