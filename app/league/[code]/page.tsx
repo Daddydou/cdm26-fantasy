@@ -283,7 +283,6 @@ export default function LeaguePage() {
                   </div>
                   <p className="text-xs text-white/30">
                     {nationMatchesMap[s.participant_id] ?? 0} m
-                    {' · '}Ratio: {((playersPlayedMap[s.participant_id] ?? 0) > 0 && (league.budget_per_user - s.budget_remaining) > 0) ? (Number(s.total_points) / playersPlayedMap[s.participant_id] / (league.budget_per_user - s.budget_remaining) * 1000).toFixed(1) : '-'}
                   </p>
                 </div>
               </div>
