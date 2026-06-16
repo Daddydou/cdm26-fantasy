@@ -114,7 +114,7 @@ export default function LeaguePage() {
             squadByP[sq.participant_id].push(sq.player_id)
           if (!teamToPlayerIds[sq.team]) teamToPlayerIds[sq.team] = []
           if (!teamToPlayerIds[sq.team].includes(sq.player_id)) teamToPlayerIds[sq.team].push(sq.player_id)
-          if ((sq.matches_played ?? 0) > 0)
+          if (playedTeams.has(sq.team))
             playedCountMap[sq.participant_id] = (playedCountMap[sq.participant_id] ?? 0) + 1
         }
       }
