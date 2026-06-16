@@ -130,7 +130,7 @@ export default function LeaguePage() {
           .not('rating', 'is', null)
           .order('match_date', { ascending: false })
           .order('rating', { ascending: false })
-          .limit(100)
+          .limit(1000)
 
         const ownerNames = (pid: string) =>
           (playerToParticipants[pid] ?? []).map(id => participantNameMap[id] ?? '').filter(Boolean).join(', ')
@@ -186,7 +186,7 @@ export default function LeaguePage() {
           seen.add(key)
           return true
         })
-        setRecentScores(deduped.slice(0, 200))
+        setRecentScores(deduped.slice(0, 1000))
       }
 
       setLoading(false)
