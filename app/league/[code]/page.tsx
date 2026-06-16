@@ -22,6 +22,7 @@ export default function LeaguePage() {
   const [recentScores, setRecentScores] = useState<RecentScore[]>([])
   const [squadPlayerIds, setSquadPlayerIds] = useState<Record<string, string[]>>({})
   const [selectedParticipant, setSelectedParticipant] = useState('all')
+  const [playersPlayedMap, setPlayersPlayedMap] = useState<Record<string, number>>({})
 
   useEffect(() => {
     async function load() {
@@ -53,7 +54,7 @@ export default function LeaguePage() {
 
       const [{ data: st }, { data: allSquads }, { data: processedMatches }] = await Promise.all([
         supabase.from('fantasy_standings').select().eq('league_id', lg.id).order('total_points', { ascending: false }),
-        supabase.from('fantasy_squad_detail').select('participant_id, team, player_id, player_name').eq('league_id', lg.id).eq('active', true),
+        supabase.from('fantasy_squad_detail').select('participant_id, team, player_id, player_name, matches_played').eq('league_id', lg.id).eq('active', true),
         supabase.from('fantasy_matches').select('id, match_date, home_team, away_team').eq('processed', true).order('match_date', { ascending: false }),
       ])
 
@@ -100,8 +101,9 @@ export default function LeaguePage() {
       const participantNameMap: Record<string, string> = {}
       const teamToPlayerIds: Record<string, string[]> = {}
 
+      const playedCountMap: Record<string, number> = {}
       for (const s of allSquads || []) {
-        const sq = s as { participant_id: string; team: string; player_id: string; player_name: string }
+        const sq = s as { participant_id: string; team: string; player_id: string; player_name: string; matches_played: number }
         if (sq.player_id) {
           playerInfoMap[sq.player_id] = { player_name: sq.player_name, team: sq.team }
           if (!playerToParticipants[sq.player_id]) playerToParticipants[sq.player_id] = []
@@ -112,6 +114,8 @@ export default function LeaguePage() {
             squadByP[sq.participant_id].push(sq.player_id)
           if (!teamToPlayerIds[sq.team]) teamToPlayerIds[sq.team] = []
           if (!teamToPlayerIds[sq.team].includes(sq.player_id)) teamToPlayerIds[sq.team].push(sq.player_id)
+          if ((sq.matches_played ?? 0) > 0)
+            playedCountMap[sq.participant_id] = (playedCountMap[sq.participant_id] ?? 0) + 1
         }
       }
       for (const s of st || []) {
@@ -119,6 +123,7 @@ export default function LeaguePage() {
       }
 
       setSquadPlayerIds(squadByP)
+      setPlayersPlayedMap(playedCountMap)
 
       const allPlayerIds = Object.keys(playerInfoMap)
       if (allPlayerIds.length > 0) {
@@ -278,7 +283,8 @@ export default function LeaguePage() {
                   </div>
                   <p className="text-xs text-white/30">
                     {nationMatchesMap[s.participant_id] ?? 0} m
-                    {' · '}{Number(s.value_for_money).toFixed(1)} vfm
+                    {' · '}Note moy: {(playersPlayedMap[s.participant_id] ?? 0) > 0 ? (Number(s.total_points) / playersPlayedMap[s.participant_id]).toFixed(1) : '-'}
+                    {' · '}Ratio €: {(league.budget_per_user - s.budget_remaining) > 0 ? (Number(s.total_points) / (league.budget_per_user - s.budget_remaining) * 1000).toFixed(1) : '-'}
                     {' · '}{(winPctMap[s.participant_id] ?? 0).toFixed(1)}%
                   </p>
                 </div>
