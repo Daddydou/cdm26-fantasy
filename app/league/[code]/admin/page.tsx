@@ -25,10 +25,15 @@ export default function AdminPage() {
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/'); return }
+      console.log('[admin] user:', user)
+      if (!user) { console.log('[admin] redirect → / : pas d\'utilisateur connecté'); router.push('/'); return }
 
-      const { data: lg } = await supabase.from('fantasy_leagues').select().eq('code', code).single()
-      if (!lg || lg.admin_user_id !== user.id) { router.push(`/league/${code}`); return }
+      const { data: lg, error: lgError } = await supabase.from('fantasy_leagues').select().eq('code', code).single()
+      console.log('[admin] league:', lg, 'error:', lgError)
+      if (!lg || lg.admin_user_id !== user.id) {
+        console.log('[admin] redirect → /league :', !lg ? 'ligue introuvable' : `admin_user_id (${lg.admin_user_id}) !== user.id (${user.id})`)
+        router.push(`/league/${code}`); return
+      }
       setLeague(lg)
 
       const { data: ps } = await supabase.from('fantasy_participants').select()
