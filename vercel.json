@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/fetch-ratings",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/phase-check",
+      "schedule": "*/15 * * * *"
     }
   ]
 }
