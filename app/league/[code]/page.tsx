@@ -225,7 +225,7 @@ export default function LeaguePage() {
         </div>
         {isAdmin && (
           <Link href={`/league/${code}/admin`} className="btn-ghost text-xs">
-            ⚙ Admin
+            ⚙️ Admin
           </Link>
         )}
       </div>
